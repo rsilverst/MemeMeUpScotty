@@ -31,7 +31,8 @@ data class ReplicatePredictionInput(
     val negative_prompt: String? = null,
     val width: Int? = null,
     val height: Int? = null,
-    val seed: Int? = null
+    val seed: Int? = null,
+    val disable_safety_checker: Boolean? = null
 )
 
 @JsonClass(generateAdapter = true)

@@ -37,7 +37,10 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
                 input = ReplicatePredictionInput(
                     prompt = composePrompt(prompt),
                     negative_prompt = NEGATIVE_PROMPT,
-                    seed = Random.nextInt(0, Int.MAX_VALUE)
+                    seed = Random.nextInt(0, Int.MAX_VALUE),
+                    // Personal/single-user app — brief explicitly says no content moderation.
+                    // Models that don't accept this field ignore it.
+                    disable_safety_checker = true
                 )
             )
 
