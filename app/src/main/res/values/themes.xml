@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.MemeMeUpScotty" parent="Theme.MaterialComponents.Light" />
+</resources>
