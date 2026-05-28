@@ -45,6 +45,7 @@ import androidx.window.core.layout.WindowWidthSizeClass
 import coil.compose.AsyncImage
 import com.rsilverst.mememeupscotty.R
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
+import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,6 +110,8 @@ fun MemeContent(
     var prompt by remember { mutableStateOf("") }
     var topText by remember { mutableStateOf("") }
     var bottomText by remember { mutableStateOf("") }
+
+    val selectedModel by viewModel.selectedModel.collectAsState()
 
     val focusManager = LocalFocusManager.current
 
@@ -237,6 +240,11 @@ fun MemeContent(
                     onValueChange = { prompt = it }
                 )
 
+                ModelSelector(
+                    selected = selectedModel,
+                    onSelect = { viewModel.selectModel(it) }
+                )
+
                 ControlButtons(
                     generationState = generationState,
                     hasGeneratedImage = hasGeneratedImage,
@@ -280,6 +288,13 @@ fun MemeContent(
                 onValueChange = { prompt = it }
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ModelSelector(
+                selected = selectedModel,
+                onSelect = { viewModel.selectModel(it) }
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Box(
@@ -314,6 +329,56 @@ fun MemeContent(
             
             // padding for FAB
             Spacer(modifier = Modifier.height(72.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModelSelector(
+    selected: ImageModel,
+    onSelect: (ImageModel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = selected.label,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(24.dp)),
+            shape = RoundedCornerShape(24.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                cursorColor = Color.Black
+            )
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            ImageModel.entries.forEach { model ->
+                DropdownMenuItem(
+                    text = { Text(model.label) },
+                    onClick = {
+                        onSelect(model)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }

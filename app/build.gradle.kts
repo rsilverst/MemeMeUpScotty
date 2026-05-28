@@ -13,7 +13,6 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 val replicateToken = localProperties.getProperty("REPLICATE_API_TOKEN") ?: System.getenv("REPLICATE_API_TOKEN") ?: "YOUR_ACCESS_TOKEN"
-val replicateModelId = localProperties.getProperty("REPLICATE_MODEL_ID") ?: System.getenv("REPLICATE_MODEL_ID") ?: "sdxl-based/juggernaut-xl-lightning"
 
 if (replicateToken.isBlank() || replicateToken == "YOUR_ACCESS_TOKEN") {
     logger.warn("""
@@ -50,7 +49,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "REPLICATE_API_TOKEN", "\"$replicateToken\"")
-        buildConfigField("String", "REPLICATE_MODEL_ID", "\"$replicateModelId\"")
     }
 
     buildTypes {

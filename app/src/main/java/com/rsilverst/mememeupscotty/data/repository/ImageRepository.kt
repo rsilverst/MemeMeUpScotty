@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import retrofit2.Response
 import java.io.File
+import kotlin.random.Random
 
 interface ImageRepository {
     suspend fun generateImage(modelId: String, prompt: String, cacheDir: File): Result<File>
@@ -34,7 +35,8 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
                 version = versionId,
                 input = ReplicatePredictionInput(
                     prompt = composePrompt(prompt),
-                    negative_prompt = NEGATIVE_PROMPT
+                    negative_prompt = NEGATIVE_PROMPT,
+                    seed = Random.nextInt(0, Int.MAX_VALUE)
                 )
             )
 
