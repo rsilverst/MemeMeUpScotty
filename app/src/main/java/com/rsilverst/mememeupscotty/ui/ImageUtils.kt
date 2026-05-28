@@ -14,7 +14,6 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.core.graphics.scale
 
 suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> {
     val appContext = context.applicationContext
@@ -99,65 +98,4 @@ suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
         e.printStackTrace()
         Result.failure(e)
     }
-}
-
-/**
- * Generates a high-fidelity meme bitmap by drawing the top and bottom text overlay
- * directly onto the source high-resolution background bitmap.
- * This bypasses device screen and UI-rendering resolution limits.
- */
-fun generateHighResMeme(baseBitmap: Bitmap, topText: String, bottomText: String): Bitmap {
-    val highRes = try {
-        baseBitmap.copy(Bitmap.Config.ARGB_8888, true)
-    } catch (_: OutOfMemoryError) {
-        try {
-            // Fallback 1: Try copying with RGB_565 which uses half the memory per pixel (2 bytes vs 4 bytes)
-            baseBitmap.copy(Bitmap.Config.RGB_565, true)
-        } catch (_: OutOfMemoryError) {
-            try {
-                // Fallback 2: Try scaling the bitmap down to half-size to reduce memory footprint
-                val newWidth = (baseBitmap.width / 2).coerceAtLeast(1)
-                val newHeight = (baseBitmap.height / 2).coerceAtLeast(1)
-                val scaled = baseBitmap.scale(newWidth, newHeight)
-                try {
-                    scaled.copy(Bitmap.Config.ARGB_8888, true)
-                } catch (_: OutOfMemoryError) {
-                    scaled.copy(Bitmap.Config.RGB_565, true)
-                }
-            } catch (e4: OutOfMemoryError) {
-                // Fallback 3: Throw a descriptive exception that the VM can catch to inform the user
-                throw RuntimeException("Failed to generate high-resolution meme due to insufficient memory.", e4)
-            }
-        }
-    }
-    val canvas = android.graphics.Canvas(highRes)
-    val paint = android.graphics.Paint().apply {
-        textSize = highRes.width * 0.08f // responsive size relative to source resolution
-        typeface = android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.BOLD)
-        textAlign = android.graphics.Paint.Align.CENTER
-    }
-    
-    // 1. Draw Top Text Outline
-    paint.color = android.graphics.Color.BLACK
-    paint.style = android.graphics.Paint.Style.STROKE
-    paint.strokeWidth = highRes.width * 0.015f
-    canvas.drawText(topText, highRes.width / 2f, highRes.height * 0.12f, paint)
-    
-    // 2. Draw Top Text Fill
-    paint.color = android.graphics.Color.WHITE
-    paint.style = android.graphics.Paint.Style.FILL
-    canvas.drawText(topText, highRes.width / 2f, highRes.height * 0.12f, paint)
-    
-    // 3. Draw Bottom Text Outline
-    paint.color = android.graphics.Color.BLACK
-    paint.style = android.graphics.Paint.Style.STROKE
-    paint.strokeWidth = highRes.width * 0.015f
-    canvas.drawText(bottomText, highRes.width / 2f, highRes.height * 0.90f, paint)
-    
-    // 4. Draw Bottom Text Fill
-    paint.color = android.graphics.Color.WHITE
-    paint.style = android.graphics.Paint.Style.FILL
-    canvas.drawText(bottomText, highRes.width / 2f, highRes.height * 0.90f, paint)
-    
-    return highRes
 }

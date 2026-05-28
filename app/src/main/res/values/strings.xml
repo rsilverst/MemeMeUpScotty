@@ -16,4 +16,9 @@
     <string name="default_top_text">TOP TEXT</string>
     <string name="default_bottom_text">BOTTOM TEXT</string>
     <string name="share_chooser_title">Share Meme</string>
+    <string name="delete_text_box">Remove this text box</string>
+    <string name="resize_text_box">Resize this text box</string>
+    <string name="move_text_box">Move this text box</string>
+    <string name="add_top_text">Add top text</string>
+    <string name="add_bottom_text">Add bottom text</string>
 </resources>

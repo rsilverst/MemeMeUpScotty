@@ -6,15 +6,32 @@ import android.graphics.Typeface
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.ErrorOutline
+import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.*
@@ -48,9 +65,7 @@ import com.rsilverst.mememeupscotty.R
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,27 +138,26 @@ fun MemeContent(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    var capturing by remember { mutableStateOf(false) }
+
     val savedToGallery = stringResource(R.string.saved_to_gallery)
     val failedToSave = stringResource(R.string.failed_to_save)
     val storagePermissionRequired = stringResource(R.string.storage_permission_required)
 
+    suspend fun captureCleanBitmap(): android.graphics.Bitmap {
+        capturing = true
+        // Two frames: first runs recomposition with controls hidden, second ensures the
+        // draw pass records the controls-less content into graphicsLayer.
+        withFrameNanos { }
+        withFrameNanos { }
+        val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+        capturing = false
+        return bitmap
+    }
+
     val performSave = {
         coroutineScope.launch {
-            val bitmap = if (generationState is GenerationState.Success) {
-                val file = generationState.imageFile
-                val baseBitmap = withContext(Dispatchers.IO) {
-                    android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                }
-                if (baseBitmap != null) {
-                    withContext(Dispatchers.Default) {
-                        generateHighResMeme(baseBitmap, topText, bottomText)
-                    }
-                } else {
-                    graphicsLayer.toImageBitmap().asAndroidBitmap()
-                }
-            } else {
-                graphicsLayer.toImageBitmap().asAndroidBitmap()
-            }
+            val bitmap = captureCleanBitmap()
             saveBitmapToGallery(context, bitmap)
                 .onSuccess {
                     snackbarHostState.showSnackbar(savedToGallery)
@@ -199,17 +213,7 @@ fun MemeContent(
             }
         } else {
             coroutineScope.launch {
-                val file = generationState.imageFile
-                val baseBitmap = withContext(Dispatchers.IO) {
-                    android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                }
-                val bitmap = if (baseBitmap != null) {
-                    withContext(Dispatchers.Default) {
-                        generateHighResMeme(baseBitmap, topText, bottomText)
-                    }
-                } else {
-                    graphicsLayer.toImageBitmap().asAndroidBitmap()
-                }
+                val bitmap = captureCleanBitmap()
                 shareBitmap(context, bitmap)
                     .onSuccess {
                         // Successfully shared or opened chooser
@@ -272,7 +276,8 @@ fun MemeContent(
                     onTopTextChange = { topText = it },
                     bottomText = bottomText,
                     onBottomTextChange = { bottomText = it },
-                    graphicsLayer = graphicsLayer
+                    graphicsLayer = graphicsLayer,
+                    capturing = capturing
                 )
             }
         }
@@ -310,7 +315,8 @@ fun MemeContent(
                     onTopTextChange = { topText = it },
                     bottomText = bottomText,
                     onBottomTextChange = { bottomText = it },
-                    graphicsLayer = graphicsLayer
+                    graphicsLayer = graphicsLayer,
+                    capturing = capturing
                 )
             }
 
@@ -468,49 +474,211 @@ fun ControlButtons(
 fun MemeTextField(
     value: String,
     onValueChange: (String) -> Unit,
+    placeholder: String,
+    offset: Offset,
+    onOffsetChange: (Offset) -> Unit,
+    size: Size?,
+    onSizeChange: (Size) -> Unit,
+    showControls: Boolean,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val strokeWidth = remember(density) { with(density) { 6.sp.toPx() } }
     val memeFont = remember { FontFamily(Typeface.create("sans-serif-condensed", Typeface.NORMAL)) }
+    val textMeasurer = rememberTextMeasurer()
+    val minWidthPx = with(density) { 60.dp.toPx() }
+    val minHeightPx = with(density) { 40.dp.toPx() }
+    var currentRenderedSize by remember { mutableStateOf(IntSize.Zero) }
 
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        textStyle = TextStyle(
-            color = Color.White,
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Black,
-            fontFamily = memeFont,
-            textAlign = TextAlign.Center
-        ),
-        cursorBrush = SolidColor(Color.White),
-        decorationBox = { innerTextField ->
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Background outline text
-                Text(
-                    text = value,
-                    style = TextStyle(
-                        color = Color.Black,
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = memeFont,
-                        textAlign = TextAlign.Center,
-                        drawStyle = Stroke(
-                            width = strokeWidth,
-                            join = StrokeJoin.Round
-                        )
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                innerTextField()
-            }
-        },
+    // pointerInput(Unit) captures these once; State wrappers keep the closures reading the latest values.
+    val latestOffset by rememberUpdatedState(offset)
+    val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
+    val latestSize by rememberUpdatedState(size)
+    val latestOnSizeChange by rememberUpdatedState(onSizeChange)
+
+    val sizeModifier = if (size != null) {
+        Modifier.size(
+            width = with(density) { size.width.toDp() },
+            height = with(density) { size.height.toDp() }
+        )
+    } else {
+        // Default: wrap text content so the box has visible edges to drag against.
+        Modifier
+    }
+
+    Box(
         modifier = modifier
-    )
+            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
+            .then(sizeModifier)
+            .onSizeChanged { currentRenderedSize = it }
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    latestOnOffsetChange(
+                        Offset(latestOffset.x + dragAmount.x, latestOffset.y + dragAmount.y)
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        BoxWithConstraints {
+            val maxWidthPx = constraints.maxWidth
+            val maxHeightPx = size?.height?.toInt()
+                ?: with(density) { 96.dp.toPx() }.toInt()
+            val displayText = value.ifEmpty { placeholder }
+            val fontSize = remember(displayText, maxWidthPx, maxHeightPx) {
+                findBestFitFontSize(displayText, textMeasurer, memeFont, maxWidthPx, maxHeightPx)
+            }
+            val strokeWidthPx = with(density) { (fontSize.value * 0.15f).sp.toPx() }
+            val baseStyle = TextStyle(
+                fontSize = fontSize,
+                fontWeight = FontWeight.Black,
+                fontFamily = memeFont,
+                textAlign = TextAlign.Center
+            )
+
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                textStyle = baseStyle.copy(color = Color.White),
+                cursorBrush = SolidColor(Color.White),
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.Center) {
+                        when {
+                            value.isNotEmpty() -> {
+                                Text(
+                                    text = value,
+                                    style = baseStyle.copy(
+                                        color = Color.Black,
+                                        drawStyle = Stroke(
+                                            width = strokeWidthPx,
+                                            join = StrokeJoin.Round
+                                        )
+                                    )
+                                )
+                            }
+                            showControls -> {
+                                Text(
+                                    text = placeholder,
+                                    style = baseStyle.copy(color = Color.White.copy(alpha = 0.45f))
+                                )
+                            }
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+        }
+
+        if (showControls) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(32.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            latestOnOffsetChange(
+                                Offset(latestOffset.x + dragAmount.x, latestOffset.y + dragAmount.y)
+                            )
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.OpenWith,
+                    contentDescription = stringResource(R.string.move_text_box),
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.delete_text_box),
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(32.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            val startW = latestSize?.width ?: currentRenderedSize.width.toFloat()
+                            val startH = latestSize?.height ?: currentRenderedSize.height.toFloat()
+                            val newW = (startW + dragAmount.x).coerceAtLeast(minWidthPx)
+                            val newH = (startH + dragAmount.y).coerceAtLeast(minHeightPx)
+                            latestOnSizeChange(Size(newW, newH))
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.OpenInFull,
+                    contentDescription = stringResource(R.string.resize_text_box),
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AddTextButton(
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f))
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(label)
+    }
+}
+
+private fun findBestFitFontSize(
+    text: String,
+    textMeasurer: TextMeasurer,
+    fontFamily: FontFamily,
+    maxWidthPx: Int,
+    maxHeightPx: Int
+): TextUnit {
+    if (text.isEmpty() || maxWidthPx <= 0) return 40.sp
+    val widthConstraints = Constraints(maxWidth = maxWidthPx)
+    for (sp in 40 downTo 14 step 2) {
+        val layout = textMeasurer.measure(
+            text = text,
+            style = TextStyle(
+                fontSize = sp.sp,
+                fontFamily = fontFamily,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center
+            ),
+            constraints = widthConstraints
+        )
+        if (layout.size.height <= maxHeightPx) return sp.sp
+    }
+    return 14.sp
 }
 
 @Composable
@@ -520,8 +688,17 @@ fun MemeImagePreview(
     onTopTextChange: (String) -> Unit,
     bottomText: String,
     onBottomTextChange: (String) -> Unit,
-    graphicsLayer: GraphicsLayer
+    graphicsLayer: GraphicsLayer,
+    capturing: Boolean
 ) {
+    var topVisible by remember { mutableStateOf(true) }
+    var bottomVisible by remember { mutableStateOf(true) }
+    var topOffset by remember { mutableStateOf(Offset.Zero) }
+    var bottomOffset by remember { mutableStateOf(Offset.Zero) }
+    var topSize by remember { mutableStateOf<Size?>(null) }
+    var bottomSize by remember { mutableStateOf<Size?>(null) }
+    val showControls = !capturing
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -582,23 +759,63 @@ fun MemeImagePreview(
         }
 
         // Top Text Overlay
-        MemeTextField(
-            value = topText,
-            onValueChange = onTopTextChange,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                .fillMaxWidth()
-        )
+        if (topVisible) {
+            MemeTextField(
+                value = topText,
+                onValueChange = onTopTextChange,
+                placeholder = stringResource(R.string.default_top_text),
+                offset = topOffset,
+                onOffsetChange = { topOffset = it },
+                size = topSize,
+                onSizeChange = { topSize = it },
+                showControls = showControls,
+                onDelete = {
+                    topVisible = false
+                    topOffset = Offset.Zero
+                    topSize = null
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+            )
+        } else if (showControls) {
+            AddTextButton(
+                onClick = { topVisible = true },
+                label = stringResource(R.string.add_top_text),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp)
+            )
+        }
 
         // Bottom Text Overlay
-        MemeTextField(
-            value = bottomText,
-            onValueChange = onBottomTextChange,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                .fillMaxWidth()
-        )
+        if (bottomVisible) {
+            MemeTextField(
+                value = bottomText,
+                onValueChange = onBottomTextChange,
+                placeholder = stringResource(R.string.default_bottom_text),
+                offset = bottomOffset,
+                onOffsetChange = { bottomOffset = it },
+                size = bottomSize,
+                onSizeChange = { bottomSize = it },
+                showControls = showControls,
+                onDelete = {
+                    bottomVisible = false
+                    bottomOffset = Offset.Zero
+                    bottomSize = null
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+            )
+        } else if (showControls) {
+            AddTextButton(
+                onClick = { bottomVisible = true },
+                label = stringResource(R.string.add_bottom_text),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp)
+            )
+        }
     }
 }
