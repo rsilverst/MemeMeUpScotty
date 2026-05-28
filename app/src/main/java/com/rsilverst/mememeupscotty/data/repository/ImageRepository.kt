@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Request
+import org.json.JSONObject
 import retrofit2.Response
 import java.io.File
 import kotlin.random.Random
@@ -97,8 +98,40 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
         if (response.isSuccessful) response.body() else null
 
     private fun errorFor(response: Response<*>, op: String): Exception {
-        val body = response.errorBody()?.string() ?: "no body"
-        return Exception("Replicate $op failed: HTTP ${response.code()} — $body")
+        val body = response.errorBody()?.string().orEmpty()
+        return Exception(friendlyMessage(response.code(), body, op))
+    }
+
+    private fun friendlyMessage(code: Int, body: String, op: String): String {
+        val detail = parseJsonField(body, "detail")
+        val retryAfter = parseJsonInt(body, "retry_after")
+        return when (code) {
+            401 -> "Your Replicate API token isn't accepted. Check REPLICATE_API_TOKEN in local.properties."
+            402 -> "You're out of Replicate credit. Add some at replicate.com/account/billing."
+            404 -> "This model isn't available on Replicate right now. Try a different one from the dropdown."
+            429 -> buildString {
+                append("Hit Replicate's rate limit.")
+                if (retryAfter != null) {
+                    append(" Try again in ${retryAfter}s.")
+                } else {
+                    append(" Try again in a few seconds.")
+                }
+            }
+            in 500..599 -> "Replicate is having a problem (HTTP $code). Try again in a moment."
+            else -> detail?.let { "Replicate: $it" } ?: "Replicate $op failed (HTTP $code)."
+        }
+    }
+
+    private fun parseJsonField(body: String, field: String): String? = try {
+        if (body.isBlank()) null else JSONObject(body).optString(field).takeIf { it.isNotBlank() }
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun parseJsonInt(body: String, field: String): Int? = try {
+        if (body.isBlank()) null else JSONObject(body).optInt(field, -1).takeIf { it > 0 }
+    } catch (_: Exception) {
+        null
     }
 
     private fun parseModelId(modelId: String): Pair<String, String>? {
