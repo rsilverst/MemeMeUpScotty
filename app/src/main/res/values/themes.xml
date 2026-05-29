@@ -1,4 +1,7 @@
 <resources>
-
-    <style name="Theme.MemeMeUpScotty" parent="Theme.MaterialComponents.Light" />
+    <style name="Theme.MemeMeUpScotty" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/space_900</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>
