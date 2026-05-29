@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidX SplashScreen API expects a 288dp viewport with the visible
+  glyph centered inside a 192dp safe area. Geometry mirrors the
+  launcher mark so the splash → home transition reads as one identity.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+
+    <!-- Outer glow ring. -->
+    <path
+        android:strokeColor="#5DFCFF"
+        android:strokeWidth="2.2"
+        android:strokeAlpha="0.30"
+        android:fillColor="#00000000"
+        android:pathData="M144,56 A88,88 0 0,1 144,232 A88,88 0 0,1 144,56 Z" />
+
+    <!-- Primary ring. -->
+    <path
+        android:strokeColor="#5DFCFF"
+        android:strokeWidth="4"
+        android:fillColor="#00000000"
+        android:pathData="M144,64 A80,80 0 0,1 144,224 A80,80 0 0,1 144,64 Z" />
+
+    <!-- Lightning bolt. -->
+    <path
+        android:fillColor="#5DFCFF"
+        android:pathData="M160,96 L112,152 L140,152 L124,200 L176,144 L148,144 Z" />
+</vector>

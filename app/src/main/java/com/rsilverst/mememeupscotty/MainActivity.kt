@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rsilverst.mememeupscotty.data.network.NetworkModule
@@ -18,6 +19,10 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Must run before super.onCreate(): swaps the .Starting theme out for the
+        // post-splash app theme and keeps the system splash visible until the
+        // first Compose frame.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
