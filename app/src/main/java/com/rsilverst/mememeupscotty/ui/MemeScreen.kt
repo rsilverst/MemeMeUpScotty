@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -86,6 +87,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.rsilverst.mememeupscotty.R
 import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
+import com.rsilverst.mememeupscotty.ui.theme.MemeMeUpScottyTheme
 import com.rsilverst.mememeupscotty.ui.theme.Photon500
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
@@ -1735,4 +1737,289 @@ private fun findBestFitFontSize(
         if (layout.size.height <= maxHeightPx) return sp.sp
     }
     return 14.sp
+}
+
+// ============================================================================
+// PREVIEWS
+// All previews are dark-on-Space900 to match the app's runtime appearance.
+// ============================================================================
+
+private const val PREVIEW_BG = 0xFF0B0E1FL
+
+@Composable
+private fun PreviewShell(
+    width: Int = 360,
+    content: @Composable () -> Unit
+) {
+    MemeMeUpScottyTheme {
+        Box(
+            modifier = Modifier
+                .background(Space900)
+                .padding(16.dp)
+                .width(width.dp)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun PreviewCanvasFrame(content: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(328.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Space700)
+            .border(1.dp, Space500, RoundedCornerShape(20.dp)),
+        contentAlignment = Alignment.Center,
+        content = content
+    )
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 72)
+@Composable
+private fun BridgeTopBarPreview() {
+    MemeMeUpScottyTheme {
+        Box(modifier = Modifier.background(Space900)) {
+            BridgeTopBar()
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasEmptyStatePreview() {
+    PreviewShell {
+        PreviewCanvasFrame {
+            EmptyState(onPromptChip = {})
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasLoadingStatePreview() {
+    PreviewShell {
+        PreviewCanvasFrame {
+            LoadingState()
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasErrorStatePreview_Quota() {
+    PreviewShell {
+        PreviewCanvasFrame {
+            ErrorState(
+                message = "You're out of Replicate credit. Add some at replicate.com/account/billing.",
+                onRetry = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasErrorStatePreview_Auth() {
+    PreviewShell {
+        PreviewCanvasFrame {
+            ErrorState(
+                message = "Your Replicate API token isn't accepted. Check REPLICATE_API_TOKEN in local.properties.",
+                onRetry = {}
+            )
+        }
+    }
+}
+
+// Fake "image" — radial gradient stand-in so we can preview captions over content.
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasSuccessWithCaptionsPreview() {
+    PreviewShell {
+        Box(
+            modifier = Modifier
+                .size(328.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF3A2A5C),
+                            Color(0xFF1A1F3E),
+                            Color(0xFF0F1024)
+                        )
+                    )
+                )
+                .border(1.dp, Space500, RoundedCornerShape(20.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "I CAN HAS",
+                fontFamily = MemeCaptionFontFamily,
+                fontWeight = FontWeight.Normal,
+                fontSize = 36.sp,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 20.dp)
+            )
+            Text(
+                text = "WARP DRIVE?",
+                fontFamily = MemeCaptionFontFamily,
+                fontWeight = FontWeight.Normal,
+                fontSize = 36.sp,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 20.dp)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 80)
+@Composable
+private fun HudStripPreview() {
+    PreviewShell {
+        HudStrip(
+            selectedModel = ImageModel.JUGGERNAUT,
+            generationState = GenerationState.Success(java.io.File("")),
+            onOpenModelPicker = {},
+            onReroll = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 100)
+@Composable
+private fun EnergizeButtonPreview_Generate() {
+    PreviewShell {
+        EnergizeButton(
+            generationState = GenerationState.Idle,
+            hasGeneratedImage = false,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 100)
+@Composable
+private fun EnergizeButtonPreview_Regenerate() {
+    PreviewShell {
+        EnergizeButton(
+            generationState = GenerationState.Success(java.io.File("")),
+            hasGeneratedImage = true,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 100)
+@Composable
+private fun EnergizeButtonPreview_Loading() {
+    PreviewShell {
+        EnergizeButton(
+            generationState = GenerationState.Loading,
+            hasGeneratedImage = false,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 110)
+@Composable
+private fun ModelCardPreview_Selected() {
+    PreviewShell {
+        ModelCard(
+            model = ImageModel.JUGGERNAUT,
+            isSelected = true,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 110)
+@Composable
+private fun ModelCardPreview_Unselected() {
+    PreviewShell {
+        ModelCard(
+            model = ImageModel.FLUX_SCHNELL,
+            isSelected = false,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 100)
+@Composable
+private fun PromptInputPreview_Empty() {
+    PreviewShell {
+        PromptInput(value = "", onValueChange = {}, singleLine = true)
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 100)
+@Composable
+private fun PromptInputPreview_Filled() {
+    PreviewShell {
+        PromptInput(
+            value = "a corgi as the captain of the enterprise",
+            onValueChange = {},
+            singleLine = false
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 280)
+@Composable
+private fun DockPreview_NoImage() {
+    PreviewShell {
+        Dock(
+            prompt = "",
+            onPromptChange = {},
+            generationState = GenerationState.Idle,
+            hasGeneratedImage = false,
+            onEnergize = {},
+            onSave = {},
+            onShare = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 280)
+@Composable
+private fun DockPreview_WithImage() {
+    PreviewShell {
+        Dock(
+            prompt = "a corgi as the captain",
+            onPromptChange = {},
+            generationState = GenerationState.Success(java.io.File("")),
+            hasGeneratedImage = true,
+            onEnergize = {},
+            onSave = {},
+            onShare = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 80)
+@Composable
+private fun ModelSelectorButtonPreview() {
+    PreviewShell {
+        ModelSelectorButton(
+            model = ImageModel.REALVIS,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 80)
+@Composable
+private fun AddTextPillPreview() {
+    PreviewShell {
+        AddTextPill(
+            onClick = {},
+            label = "Add top text"
+        )
+    }
 }
