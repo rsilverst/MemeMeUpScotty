@@ -1,0 +1,567 @@
+# Code Review — Meme Me Up Scotty
+
+**Reviewer:** Engineering TL (with input from UX Lead and PM)
+**Scope:** Full review of all code, resources, tests, and product surface on `main` as of 2026-05-29.
+**Build state at review:** ~2,025 LOC `MemeScreen.kt`, single Activity, single ViewModel, Replicate REST integration, dark "Stardate" Star-Trek-themed design system.
+
+---
+
+## Status Log
+
+Track of what's been landed. Each entry: PR, items, date, deviations from the original recommendation.
+
+| PR | Items | Date | Notes |
+|---|---|---|---|
+| **PR 1** | A3, A4, A5, C4 | 2026-05-29 | All four landed as recommended, **plus one unplanned addition**: `lint { disable += "Instantiatable" }` in `app/build.gradle.kts` to work around an AGP-alpha lint false positive on `ComponentActivity`. Should be removed once G1 (move off alpha AGP) lands. Release build (`assembleRelease`) and unit tests verified green. A4 implementation: chose the simpler `allowBackup="false"` route over populating the rule files; the `fullBackupContent`/`dataExtractionRules` manifest attrs were left in place but are inert. |
+
+Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; (blank) = not yet started.
+
+---
+
+## TL;DR
+
+The app does what the brief asked: prompt → AI image → caption → save/share. The Stardate design system is strong and the engineering slice (network → repo → VM → Compose) is clean for its size. **But:** there are P0 distribution blockers (API token in APK, safety checker disabled, ProGuard off, trademark risk), the "meme creator" feature surface is narrower than users expect (AI-only source, 1:1 canvas, fixed top/bottom captions), and `MemeScreen.kt` is a 2,000-line god file that will not scale.
+
+**Recommended order of work:**
+1. **Group A — Security & Release-gating (P0).** Token handling, safety, ProGuard, logging, backup.
+2. **Group B — Architecture cleanup (P1).** Split `MemeScreen.kt`, typed errors, DI, snake-case Moshi names.
+3. **Group C — UX polish (P1).** Drag-bounds, undo for delete, cancel-during-generate, capture timing, accessibility/touch targets.
+4. **Group D — Product gaps (P1/P2).** Image source picker, aspect ratios, N text boxes, prompt/generation history.
+5. **Group E — Testing (P2).** Repo unit tests, UI/Compose tests, prune skeletons.
+6. **Group F — Polish & i18n (P3).** Localize strings, rename app/trademark cleanup, theme phrasing.
+
+---
+
+# Group A — Security, Privacy, Release-gating (P0)
+
+These block any public distribution. Even for internal/sideload, they are real risks.
+
+### A1. Replicate API token is compiled into the APK [P0]
+**File:** `app/build.gradle.kts:50`, `data/network/NetworkModule.kt:19`
+
+`REPLICATE_API_TOKEN` is read from `local.properties` and baked into `BuildConfig` as a string constant. Anyone with the APK can extract it with `apktool` or `strings`. Replicate is a billed paid service — token theft becomes the user's bill. This pattern also violates Replicate's ToS (tokens are per-user, not embeddable).
+
+It is also at risk via auto-backup (see A4).
+
+**Action:** Choose a path before any distribution:
+- **Personal-only build:** explicitly mark `release { signingConfig = … }` as internal-only, never ship to Play, and document in README.
+- **Distributable:** stand up a thin proxy (Cloudflare Worker, Vercel function, Firebase Function) that holds the token server-side. The app calls the proxy; the proxy calls Replicate. ~50 LOC server, ~10 LOC client change.
+
+### A2. Model-level safety checker is disabled [P0 for distribution / P2 for personal]
+**File:** `data/repository/ImageRepository.kt:40-43`
+
+`disable_safety_checker = true` is hardcoded. Comment justifies it as "personal/single-user app." Google Play has a Generative AI Apps policy (effective 2024) that requires safety filtering, an in-app reporting mechanism, and a content policy. This combo will trip the policy check on submission.
+
+**Action:** Default to safety-on. Add an internal-only debug toggle if needed. If distributing, also wire an in-app "Report" affordance.
+
+### A3. OkHttp body logging is unconditional [P0] ✅ **DONE (PR 1, 2026-05-29)**
+**File:** `data/network/NetworkModule.kt:12-14`
+
+`HttpLoggingInterceptor.Level.BODY` runs in release. This logs request and response bodies, including any future PII, to logcat. It also adds non-trivial overhead per request.
+
+**Action:**
+```kotlin
+level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+```
+
+### A4. Auto-backup is enabled with no exclusions [P0 once A1 is fixed] ✅ **DONE (PR 1, 2026-05-29)**
+**File:** `AndroidManifest.xml:9`, `res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml`
+
+`android:allowBackup="true"` plus empty backup rule files means everything in the app's data dir gets cloud-backed to the user's Google account. As long as A1 stands (token in BuildConfig), the token itself is fine (it lives in code, not data). But once you move to per-user tokens or any cached prediction data, you will leak.
+
+**Action:** Set `allowBackup="false"` for now, or populate `data_extraction_rules.xml` to exclude `sharedpref` and any future auth storage.
+
+**Implementation note:** went with `allowBackup="false"`. The `fullBackupContent="@xml/backup_rules"` and `dataExtractionRules="@xml/data_extraction_rules"` manifest attributes were left in place — they're inert while `allowBackup="false"` but ready to populate when per-user persistence lands.
+
+### A5. ProGuard / R8 disabled on release [P0] ⚠️ **DONE w/ deviation (PR 1, 2026-05-29)**
+**File:** `app/build.gradle.kts:53-58`
+
+```kotlin
+release { optimization { enable = false } }
+```
+No minification, no shrinking, no obfuscation. APK size is bloated and the BuildConfig token sits in plain UTF-8 inside the DEX.
+
+**Action:** Turn R8 on with `isMinifyEnabled = true`, `isShrinkResources = true`, add a `proguard-rules.pro`, and verify a release build runs end-to-end before merging.
+
+**Implementation note (deviation):** R8 + shrink-resources are on, `proguard-rules.pro` added with keep rules for `data.network.**` (Moshi-codegen DTOs) and standard stack-trace attributes. `assembleRelease` produces a 3.6 MB unsigned APK and unit tests pass.
+
+`lintVitalRelease` was failing with a known false positive ("MainActivity must extend android.app.Activity") on AGP `9.3.0-alpha06` + AndroidX activity `1.13`. Suppressed the `Instantiatable` check only, with an in-source comment pointing to **G1** (move off alpha AGP) as the long-term fix. The suppression should be removed when G1 lands.
+
+### A6. Trademark exposure — Star Trek IP [P0 for Play / P2 internal]
+App name "Meme Me Up Scotty", "Stardate" design system, "Energize", "Materializing", "Bridge", "Subspace link rejected", "Spock holding a banana" suggested prompt. This is heavy use of CBS/Paramount-owned brand language. The Trek voice is a strength of the app's identity — but legal exposure if distributed.
+
+**Action (PM/legal):** Decide before launch:
+- Keep theme + rebrand verbally (e.g., "starship engineer aesthetic" without Trek-specific words),
+- File for parody/fair-use opinion, or
+- Pursue licensing.
+
+### A7. Hardcoded token committed risk audit [resolved — informational]
+`local.properties` is correctly listed in `.gitignore` and was never committed (verified via `git log --all -- local.properties`). Good. But anyone who has a copy of this working tree (including AI agents, build artifacts, cloud sync, etc.) now holds a live token. Rotate the token in `local.properties` if any of those have touched it.
+
+---
+
+# Group B — Architecture & Engineering (P1)
+
+### B1. `MemeScreen.kt` is 2,025 lines [P1]
+**File:** `app/src/main/java/com/rsilverst/mememeupscotty/ui/MemeScreen.kt`
+
+Holds screen root, compact + expanded layouts, canvas, every state, every overlay, every input, dock, model picker, model metadata extension props, font-fitting algorithm, and 13 previews. This is the largest source of future friction.
+
+**Action:** Split along the section comments that already exist:
+```
+ui/MemeScreen.kt           // root + state hoisting
+ui/CompactLayout.kt
+ui/ExpandedLayout.kt
+ui/canvas/MemeCanvas.kt
+ui/canvas/EmptyState.kt
+ui/canvas/LoadingState.kt
+ui/canvas/ErrorState.kt
+ui/canvas/MemeTextOverlay.kt
+ui/canvas/TransporterPad.kt
+ui/HudStrip.kt
+ui/Dock.kt
+ui/ModelPickerSheet.kt
+ui/model/ImageModelMetadata.kt   // shortLabel/shortGlyph/displayNameRes/descriptionRes
+ui/text/FontFitting.kt
+```
+Previews live next to each component.
+
+### B2. Errors are stringly-typed across the layer boundary [P1]
+**File:** `data/repository/ImageRepository.kt:108-125`, `ui/MemeScreen.kt:935-945`
+
+The repo builds a human-friendly English string, returns it as `Exception.message`. The UI then **string-matches** that English ("token" in lower, "401" in lower, "credit" in lower, …) to pick a themed title. This is fragile: any string tweak in the repo silently breaks the UI grouping, and it cannot be localized.
+
+**Action:** Replace `Result<File>` with a sealed `GenerationOutcome`:
+```kotlin
+sealed class GenerationError {
+    data object AuthRejected : GenerationError()
+    data object OutOfCredit : GenerationError()
+    data object ModelNotFound : GenerationError()
+    data class RateLimited(val retryAfterSec: Int?) : GenerationError()
+    data class Server(val code: Int) : GenerationError()
+    data class Unknown(val message: String) : GenerationError()
+}
+```
+UI maps each variant to title + detail.
+
+### B3. Stated architecture vs. actual [P1]
+The brief in `app/.agent/plan.md` lists **Jetpack Navigation 3** and **Compose Material Adaptive** as the navigation/adaptive strategy. Neither is in the dependencies. The app is single-screen and uses a hand-rolled `screenWidthDp >= 840` check.
+
+**Action:** Either update the brief to reflect reality (recommended — single screen doesn't need Nav3), or adopt `androidx.compose.material3.adaptive` for the breakpoint and any future foldable support.
+
+### B4. Snake-case Kotlin property names on data classes [P1]
+**File:** `data/network/ReplicateApi.kt:11-44`, `data/repository/ImageRepository.kt:43`
+
+`latest_version`, `negative_prompt`, `disable_safety_checker` are Kotlin properties with snake_case. Works because Moshi serializes by property name. Violates Kotlin style and confuses readers about intent.
+
+**Action:** Rename to camelCase and annotate:
+```kotlin
+@Json(name = "latest_version") val latestVersion: ReplicateModelVersion?
+```
+
+### B5. Mixed JSON parsers [P2]
+**File:** `data/repository/ImageRepository.kt:128-138`
+
+`parseJsonField` / `parseJsonInt` use `org.json.JSONObject` to dig into error bodies even though Moshi is wired up.
+
+**Action:** Define a `@JsonClass` `ReplicateError(detail: String?, retry_after: Int?)`, parse with Moshi.
+
+### B6. Hand-rolled `ViewModelFactory` is dated [P2]
+**File:** `ui/viewmodel/MainViewModel.kt:81-91`, `MainActivity.kt:42-47`
+
+Boilerplate. Modern pattern uses the `viewModel { initializer { … } }` API or Hilt.
+
+**Action:** Replace with a `viewModelFactory { initializer { MainViewModel(repo) } }` declared in MainActivity, drop the factory class entirely.
+
+### B7. Hardcoded "photorealistic" style suffix conflicts with stylized models [P1 — bug]
+**File:** `data/repository/ImageRepository.kt:146-147`
+
+```kotlin
+"$userPrompt, photorealistic, sharp focus, natural lighting, high detail, cinematic photograph"
+```
+Appended to every prompt regardless of model. Users who select **Blue Pencil XL (anime)** or **Proteus (painterly)** get a photorealistic suffix that fights the model's strengths.
+
+**Action:** Pull the style suffix into `ImageModel` metadata so each model contributes its own modifiers (or none).
+
+### B8. `NetworkModule` is an `object` singleton with no swappable seam [P2]
+**File:** `data/network/NetworkModule.kt`
+
+Functional now. Becomes a problem as soon as you want a `FakeReplicateApi` for instrumentation tests, or a second network module for A/B'd proxies.
+
+**Action:** Either Hilt (heavyweight) or a simple `interface NetworkProvider` with one prod and one test impl, injected from `MainActivity`.
+
+### B9. ImageModel.label is dead code [P3]
+**File:** `ui/viewmodel/MainViewModel.kt:13-21`
+
+The `label` field on `ImageModel` is unused — UI now reads `displayNameRes` via extension. Drop the field to avoid stale labels misleading future readers.
+
+---
+
+# Group C — Code Correctness, Threading, Performance (P1–P2)
+
+### C1. GraphicsLayer capture timing is racy [P1]
+**File:** `ui/MemeScreen.kt:249-256`
+
+```kotlin
+suspend fun captureCleanBitmap(): Bitmap {
+    capturing = true
+    withFrameNanos { }
+    withFrameNanos { }
+    val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+    capturing = false
+    return bitmap
+}
+```
+Chrome (delete chip, resize handle) is animated out with `AnimatedVisibility(..., exit = fadeOut(tween(160)))`. Two frames at 16ms = 32ms, less than the 160ms fadeOut. The captured bitmap can include partially-faded chrome.
+
+**Action:** Either use `snap()` for the chrome exit during capture, or replace the `withFrameNanos` wait with a `snapshotFlow { showChrome }.first { !it }` confirmation, then capture.
+
+### C2. `graphicsLayer.record` runs on every recomposition of the canvas [P2]
+**File:** `ui/MemeScreen.kt:582-587`
+
+The `drawWithContent { graphicsLayer.record { … } drawLayer(graphicsLayer) }` block always records, even outside capture. Each recomposition pays the layer-record cost.
+
+**Action:** Only record while `capturing` (or guarded by a "needs new snapshot" flag).
+
+### C3. Polling has no cancel UX [P1]
+**File:** `data/repository/ImageRepository.kt:74-85`, `ui/MemeScreen.kt` (Energize button)
+
+Once the user presses Energize they cannot abort until the 120s timeout. Long predictions feel like a hang.
+
+**Action:** Add a "Cancel" affordance during `Loading`. The repo already runs in `viewModelScope` so cancellation cascades correctly; just expose a `vm.cancel()` and surface a button.
+
+### C4. `MainActivity.onCreate` cleanup uses `printStackTrace` [P3] ✅ **DONE (PR 1, 2026-05-29)**
+**File:** `MainActivity.kt:37-39`
+
+`printStackTrace()` goes nowhere useful in production. Same in `ImageRepository`/`ImageUtils`.
+
+**Action:** Use `Log.w(TAG, …)` or your eventual telemetry hook.
+
+**Implementation note:** swept three call sites (`MainActivity.onCreate` cache cleanup, `saveBitmapToGallery`, `shareBitmap`). `ImageRepository` did **not** have a `printStackTrace` to clean up — it swallows deletion errors silently and returns typed failures already, so nothing to do there.
+
+### C5. No status-bar / nav-bar inset handling on the Dock [P1 — visual cutoff]
+**File:** `MainActivity.kt:27` (enableEdgeToEdge), `ui/MemeScreen.kt:1281+`
+
+`enableEdgeToEdge()` is enabled, but the Dock at the bottom of the CompactLayout has no `WindowInsets.navigationBars` padding. On 3-button-nav devices the Save/Share buttons can sit under the nav bar.
+
+**Action:** Apply `Modifier.windowInsetsPadding(WindowInsets.navigationBars)` to the Dock container (or to the Scaffold's bottom-content via `bottomBar = { Dock(...) }`).
+
+### C6. No IME action / soft-keyboard handling on inputs [P2]
+**File:** `ui/MemeScreen.kt` PromptInput, MemeTextOverlay
+
+`BasicTextField` defaults have no `KeyboardOptions(imeAction = ImeAction.Go)` for the prompt, no `onDone = { onEnergize() }`. Typing a prompt and hitting Enter does nothing.
+
+**Action:** Wire prompt input to submit on Done/Go.
+
+### C7. Hardcoded English strings in code [P2]
+**File:** `ui/MemeScreen.kt:494,501,1236`
+
+`"PROMPT"`, `"ENGINE"`, `"tap to change"` are literal in code. Block on i18n.
+
+**Action:** Move to `strings.xml`.
+
+### C8. No bounds-clamping on text overlay drag [P1 — UX bug]
+**File:** `ui/MemeScreen.kt:992-998`
+
+`detectDragGestures` updates `offset` without clamping. Users can drag a text box completely off the canvas and lose it (the canvas clips at `RoundedCornerShape(20.dp)`; chrome appears only on focus, which is lost when not visible).
+
+**Action:** Clamp `offset` to canvas bounds in the drag handler (and clamp on size change).
+
+### C9. Captions can overlap [P2]
+Top and bottom captions can be dragged onto each other with no detection. Minor; flag for UX.
+
+### C10. Pre-Q `WRITE_EXTERNAL_STORAGE` flow runs on Android 10+ unintentionally? [verified clean]
+**File:** `AndroidManifest.xml:6`, `ui/MemeScreen.kt:284-292`
+
+Manifest correctly scopes the permission to `maxSdkVersion="28"`; runtime check correctly gates on `SDK_INT < Q`. OK. Informational only.
+
+### C11. `lastGeneratedFile` lifetime is fragile [P2]
+**File:** `ui/viewmodel/MainViewModel.kt:40-65`
+
+Deleted on `onCleared` and on each next success. If the activity is killed without `onCleared` (process death), the file orphans in cache. The `MainActivity.onCreate` cleanup catches it — but only on next cold start, and only files named `generated_meme_*`. The shared file from `shareBitmap` is `shared_meme_*` and not cleaned anywhere.
+
+**Action:** Either include `shared_meme_*` in the startup cleanup, or use a `WorkManager`-backed periodic cache cleanup.
+
+### C12. Loading state has no progress or elapsed indication [P2 — UX]
+The shimmer animates but doesn't communicate progress. SDXL Lightning often returns in 3-8s; the user has no idea if 30s is "normal" or "stuck."
+
+**Action:** Show elapsed seconds, or a "Usually takes 5-10s" hint.
+
+---
+
+# Group D — UX & Visual Design Review *(UX Lead)*
+
+The Stardate design language is genuinely strong — consistent palette, fonts (Inter / Space Grotesk / Anton is a smart triple), the TransporterPad illustration, the "Energize" CTA, and the themed error titles. Top marks for personality and visual coherence. Flagged items are interaction friction, not visual quality.
+
+### D1. No "tap outside to dismiss keyboard" [P2]
+Compact layout has a scrollable column but no outer `clickable` to clear focus. Users tap empty canvas margins expecting dismissal.
+
+### D2. Disabled Save/Share has no tooltip [P3]
+When `generationState` is not Success, the buttons are visibly dim but the user has no inline explanation. The snackbar fallback ("Nothing to save yet.") only fires on click. Consider an inline helper text.
+
+### D3. No undo when deleting a text overlay [P1]
+Tap the X on a caption → caption gone, no confirmation, no undo, typed text lost. For a meme app this is brutal.
+
+**Action:** On delete, show a snackbar with "Undo" that restores the previous text + offset + size for ~5s.
+
+### D4. Capture catches mid-animation chrome [P1]
+See C1. Visual: saved memes occasionally include a faint trace of the resize handle.
+
+### D5. Empty-state suggestions are tap-to-fill, not tap-to-generate [P2]
+Tapping a suggested prompt fills the input but the user still has to scroll/find Energize. Recommend tap-to-fill-AND-generate, or add a "Use & generate" affordance.
+
+### D6. Prompt input has no character count, no clear button [P3]
+Long prompts are common. Clear-on-tap-X is a 5-LOC win.
+
+### D7. Energize button label can confuse [P3]
+After first success the label is `Energize Again` forever, even if the user changes the prompt drastically. Consider showing `Energize Again` only when the **prompt is unchanged** since last generation; otherwise show `Energize`.
+
+### D8. Model switch doesn't auto-regenerate or hint [P2]
+Picking a new model from the sheet quietly updates state; user must remember to re-press Energize. Consider auto-regenerating on model switch when a prompt already exists, or a tooltip after switching.
+
+### D9. Re-roll (HUD Casino icon) is invisible feedback [P2]
+Re-roll changes seed and regenerates. There's no toast/feedback indicating "new seed" — feels identical to Energize. Consider a small "seed: 84291" pill that pulses when re-rolled.
+
+### D10. TopAppBar has no leading icon / branding mark [P3]
+The launcher icon is a strong cyan mark — echoing it in the top bar would tie identity end-to-end.
+
+### D11. Background gradient is almost flat [P3]
+`Space900 → 0xFF0D1128 → Space900` are visually identical at most viewport sizes. The "deep space" intent is invisible. Either widen the gradient or replace with subtle starfield (cheap with a low-density Canvas).
+
+### D12. App title in TopAppBar can wrap [P3]
+"MEME ME UP SCOTTY" with `letterSpacing = 3.sp` is long on a 360dp phone. Verify on small devices; consider a shorter brand mark.
+
+### D13. Touch targets below 48dp [P2 — a11y]
+- `HudIconButton` is 32dp.
+- `ResizeHandle` is 36dp.
+- `DeleteChip` is 32dp.
+
+Material guidance is 48dp minimum. Increase invisible touch areas (`.minimumInteractiveComponentSize()` or a transparent padding).
+
+### D14. Caption stroke can fail on light-background images [P2]
+The stroke is `fontSize * 0.15f`, which gets very thin at small font sizes. On a near-white generated image, the white fill + thin stroke disappears.
+
+**Action:** Either bump stroke to a fixed minimum px, or add a slight drop shadow.
+
+### D15. Accessibility hooks are minimal [P2]
+- `BasicTextField` with custom decoration bypasses Material 3's semantics.
+- Selected model in the ModelCard has no `semantics { selected = true }`.
+- Custom Surface buttons miss `Role.Button` (Compose usually infers it; verify).
+- TalkBack reads decorative glyphs ("J", "S", "R" …) without context.
+
+**Action:** Audit with TalkBack on. Add `Modifier.semantics { … }` to Custom selectables; add `contentDescription` to model glyphs ("Juggernaut model glyph").
+
+### D16. Dynamic font scaling untested [P2]
+`findBestFitFontSize` searches 14–40sp for canvas captions, but UI text uses fixed `sp` values that should scale with user font preferences. Test at 1.3× and 1.5× system font scale.
+
+### D17. Aspect ratio is locked to 1:1 [P1 — see also E1]
+`MemeCanvas` is `aspectRatio(1f)`. Many meme platforms (Instagram landscape, Reels/TikTok 9:16) need other ratios.
+
+---
+
+# Group E — PM / Product Gaps *(PM Lead)*
+
+The brief targets four core jobs: prompt → generate → caption → save/share. All four work. **However**, "meme creator" implies a wider surface area; users coming from Mematic, ImgFlip, or similar will hit walls fast.
+
+### E1. No way to start from a user-provided image [P1 — table stakes]
+Real memes are **mostly** template-based or photo-based. AI-generated source is novel but narrow. Without "Pick from gallery" or a built-in template library, this is a "Stardate AI image captioner," not a meme creator.
+
+**Action:** Add an image source picker on the canvas empty state:
+- Generate (current)
+- Pick from gallery
+- Camera (P2)
+- Template library (P2 — a 10-template starter set goes a long way)
+
+### E2. Only 2 text boxes [P1]
+Top + bottom only. Multi-panel memes (Drake, Distracted Boyfriend) need 3+. The overlay code is already generalized — extending to N is mostly removing the top/bottom binary.
+
+**Action:** Replace `topVisible/bottomVisible` with a `List<CaptionLayer>` in state.
+
+### E3. Square canvas locks out social use cases [P1]
+See D17. Add 1:1, 4:5 (Instagram portrait), 9:16 (Reels/Stories), 16:9 (Twitter).
+
+### E4. No text styling [P1]
+Color, font, alignment, stroke width, drop shadow, all hidden. Anton white+stroke is iconic but offering yellow Impact, no-stroke serif, and one or two alternate fonts is cheap and unlocks variety.
+
+### E5. No generation history [P2]
+After Energize, the previous image is gone. Users frequently want "the second one was actually better."
+
+**Action:** Keep last N (e.g., 5) generations in memory; show a thumb strip below the canvas. P2 = persist across launches.
+
+### E6. No prompt history [P2]
+Recent prompts dropdown would be a 50-LOC addition with high power-user value.
+
+### E7. No save-as-draft / persistence [P2]
+Kill the app → lose your in-progress meme. Auto-save prompt + captions in a `DataStore` on every change.
+
+### E8. No batch generation [P2]
+Replicate models support `num_outputs`. Show a 2×2 grid of options to pick from.
+
+### E9. No upscaling / output resolution control [P3]
+SDXL outputs are ~1024px. For sharing to print or HD displays, optional 2× upscale via a separate Replicate model would be a nice-to-have.
+
+### E10. No reporting / safety affordance [P0 if shipping]
+Tied to A2. Even with safety on, Play policy expects an in-app "report this" path.
+
+### E11. No about/credits/attribution screen [P2]
+Several Replicate models have specific attribution or non-commercial clauses. Compliance + courtesy.
+
+### E12. No analytics [P3]
+No way to know which models/prompts users prefer in the wild. Not blocking; just flag.
+
+### E13. App name + theme = trademark exposure [P0 — see A6]
+
+### E14. No share/save format choice [P3]
+Saves PNG only. JPG would be smaller. WebP smaller still. Power users would appreciate a setting.
+
+---
+
+# Group F — Testing (P2)
+
+### F1. Repository is untested [P1]
+`ReplicateImageRepository` has all the polling, status mapping, and friendly-error logic — **zero tests**. This is the riskiest single class in the codebase.
+
+**Action:** Inject a `FakeReplicateApi` and cover:
+- happy path
+- `succeeded` with empty output
+- `failed` with error message
+- `canceled`
+- timeout
+- 401/402/404/429/5xx responses → correct typed errors (once B2 lands)
+
+### F2. ViewModel coverage is thin [P2]
+`MainViewModelTest` covers `Idle → Loading → Success/Error`. Missing:
+- `selectModel` updates flow
+- rapid back-to-back `generateImage` calls (race / overlapping requests)
+- cancellation
+- successful generation cleans up the previous file
+
+### F3. No UI / Compose tests [P2]
+Compose UI test deps are already wired (`androidx.compose.ui.test.junit4`). Cover the critical paths:
+- prompt entry + Energize disabled until non-blank
+- error state shows themed title + Retry
+- Save/Share disabled until Success
+- model picker selects and dismisses
+
+### F4. Stub tests should go [P3]
+`ExampleUnitTest` and `ExampleInstrumentedTest` are skeletons from the template. Delete.
+
+### F5. No `ImageUtils` tests [P2]
+`saveBitmapToGallery` and `shareBitmap` could be covered with Robolectric or instrumented tests against a fake MediaStore/FileProvider. Lower priority but they have a fair amount of branching (pre-Q vs Q+).
+
+---
+
+# Group G — Build, Dependencies, Tooling (P2)
+
+### G1. AGP and Kotlin are on alpha/preview [P2]
+- `agp = "9.3.0-alpha06"` — alpha AGP on main is a stability risk.
+- `kotlin = "2.3.21"` — confirm this is the intended Kotlin compiler version; it's well ahead of the latest stable.
+
+**Action:** Pin to the latest **stable** AGP + Kotlin for `main`; keep alpha versions on a feature branch.
+
+### G2. Java target is 11 [P3]
+Compose tooling is comfortable on 17 and gains some performance. Bump if your environment supports it.
+
+### G3. Splash icon assets are vector — good. Launcher background unreviewed.
+Verified: `ic_launcher.xml` and `ic_launcher_round.xml` exist in `mipmap-anydpi`. Foreground vector + cyan stroke matches splash. Confirm the launcher background (`ic_launcher_background.xml`) tone matches the splash brand color.
+
+### G4. `.agent/plan.md` at root is empty [P3]
+The root `/.agent/plan.md` is empty; the real plan lives at `app/.agent/plan.md`. Either consolidate or delete the empty file to avoid confusion.
+
+### G5. `mockups/redesign.html` is checked in [P3]
+Source-of-truth for the redesign. Either keep with a README note about its role, or move out of the repo.
+
+---
+
+# Summary Table
+
+| # | Group | Severity | Title |
+|---|---|---|---|
+| A1 | Security | **P0** | API token compiled into APK |
+| A2 | Policy | **P0** (distribution) | Safety checker disabled |
+| A3 | Security | **P0** | ✅ OkHttp body logging in release *(PR 1)* |
+| A4 | Privacy | **P0** | ✅ Auto-backup with no exclusions *(PR 1)* |
+| A5 | Release | **P0** | ⚠️ R8 / ProGuard disabled *(PR 1, +`Instantiatable` lint disable)* |
+| A6 | Legal | **P0** (distribution) | Star Trek trademark exposure |
+| A7 | Security | — | Token-on-disk audit (informational) |
+| B1 | Architecture | P1 | 2,025-LOC MemeScreen.kt |
+| B2 | Architecture | P1 | Stringly-typed errors across layers |
+| B3 | Architecture | P1 | Brief vs. actual divergence |
+| B4 | Code style | P1 | snake_case Kotlin properties |
+| B5 | Code style | P2 | Mixed JSON parsers |
+| B6 | Code style | P2 | Hand-rolled ViewModelFactory |
+| B7 | Correctness | P1 | Photorealistic suffix on stylized models |
+| B8 | Architecture | P2 | NetworkModule has no swappable seam |
+| B9 | Cleanup | P3 | Dead `ImageModel.label` field |
+| C1 | Correctness | P1 | GraphicsLayer capture is racy |
+| C2 | Performance | P2 | Layer records every frame |
+| C3 | UX | P1 | No cancel during generation |
+| C4 | Logging | P3 | ✅ `printStackTrace` in code *(PR 1)* |
+| C5 | UX | P1 | No nav-bar inset on Dock |
+| C6 | UX | P2 | No IME action on inputs |
+| C7 | i18n | P2 | Hardcoded English in code |
+| C8 | UX | P1 | No drag-bounds clamping |
+| C9 | UX | P2 | Caption collision unhandled |
+| C10 | Permissions | — | Pre-Q permission path verified |
+| C11 | Correctness | P2 | `shared_meme_*` files leak |
+| C12 | UX | P2 | No loading progress |
+| D1 | UX | P2 | No tap-outside-to-dismiss |
+| D2 | UX | P3 | Disabled buttons silent |
+| D3 | UX | P1 | No undo for caption delete |
+| D4 | UX | P1 | Capture catches animating chrome |
+| D5 | UX | P2 | Suggestions fill but don't generate |
+| D6 | UX | P3 | No clear button on prompt |
+| D7 | UX | P3 | Energize label outdated |
+| D8 | UX | P2 | Model switch has no signal |
+| D9 | UX | P2 | Re-roll has no feedback |
+| D10 | Visual | P3 | TopAppBar has no brand mark |
+| D11 | Visual | P3 | Background gradient is flat |
+| D12 | Visual | P3 | Title may wrap on small phones |
+| D13 | A11y | P2 | Touch targets below 48dp |
+| D14 | Visual | P2 | Caption stroke fails on light |
+| D15 | A11y | P2 | Semantics gaps |
+| D16 | A11y | P2 | Font scaling unverified |
+| D17 | UX | P1 | Aspect ratio locked to 1:1 |
+| E1 | Product | P1 | No image source picker |
+| E2 | Product | P1 | Only 2 text boxes |
+| E3 | Product | P1 | Square-only canvas |
+| E4 | Product | P1 | No text styling |
+| E5 | Product | P2 | No generation history |
+| E6 | Product | P2 | No prompt history |
+| E7 | Product | P2 | No draft persistence |
+| E8 | Product | P2 | No batch generation |
+| E9 | Product | P3 | No upscaling |
+| E10 | Policy | **P0** (distribution) | No report-content path |
+| E11 | Product | P2 | No attribution screen |
+| E12 | Product | P3 | No analytics |
+| E13 | Legal | P0 | (dup A6) |
+| E14 | Product | P3 | No format choice on save |
+| F1 | Tests | P1 | Repository untested |
+| F2 | Tests | P2 | ViewModel coverage thin |
+| F3 | Tests | P2 | No UI tests |
+| F4 | Tests | P3 | Stub tests should be deleted |
+| F5 | Tests | P2 | ImageUtils untested |
+| G1 | Build | P2 | AGP/Kotlin on alpha |
+| G2 | Build | P3 | JDK 11 → 17 |
+| G3 | Build | — | Launcher assets verified |
+| G4 | Cleanup | P3 | Empty root `.agent/plan.md` |
+| G5 | Cleanup | P3 | `mockups/redesign.html` |
+
+---
+
+## Proposed working groups
+
+When you're ready to tackle, I'd suggest pairing items so each PR is a coherent slice rather than a grab-bag:
+
+- **PR 1 — Release-block kit:** A3 (logging), A4 (backup), A5 (R8), C4 (printStackTrace). ✅ **landed 2026-05-29**
+- **PR 2 — Token + safety strategy:** A1, A2, E10 (proxy + safety + report path go together).
+- **PR 3 — Split MemeScreen:** B1.
+- **PR 4 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect).
+- **PR 5 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo).
+- **PR 6 — Inputs, drag bounds, insets:** C5, C6, C8.
+- **PR 7 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios).
+- **PR 8 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling).
+- **PR 9 — Repo + UI tests:** F1, F2, F3, F4.
+- **PR 10 — Brand + legal:** A6, E13, E11.
+
+Happy to drive any one of these. Tell me which group to start with.

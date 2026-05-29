@@ -1,5 +1,6 @@
 package com.rsilverst.mememeupscotty.data.network
 
+import com.rsilverst.mememeupscotty.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -9,8 +10,15 @@ import java.util.concurrent.TimeUnit
 object NetworkModule {
     private const val BASE_URL = "https://api.replicate.com/"
 
+    // Body-level logging includes request/response bodies and is too noisy
+    // (and a small perf hit) for release. Authorization headers are also
+    // safer to keep out of logcat.
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BODY
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
     }
 
     // Replicate uses `Token` auth scheme, not `Bearer`.

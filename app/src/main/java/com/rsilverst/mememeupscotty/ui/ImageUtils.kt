@@ -8,12 +8,15 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.content.FileProvider
 import com.rsilverst.mememeupscotty.R
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "ImageUtils"
 
 suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> {
     val appContext = context.applicationContext
@@ -60,7 +63,7 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> 
             }
             Result.success(Unit)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "saveBitmapToGallery failed", e)
             Result.failure(e)
         }
     }
@@ -95,7 +98,7 @@ suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
         }
         Result.success(Unit)
     } catch (e: Exception) {
-        e.printStackTrace()
+        Log.w(TAG, "shareBitmap failed", e)
         Result.failure(e)
     }
 }

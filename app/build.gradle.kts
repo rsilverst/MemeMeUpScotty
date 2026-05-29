@@ -52,9 +52,12 @@ android {
 
     buildTypes {
         release {
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
@@ -64,6 +67,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    lint {
+        // False positive on AGP 9.3-alpha + AndroidX activity 1.13: lint can't
+        // resolve that androidx.activity.ComponentActivity transitively extends
+        // android.app.Activity, and flags MainActivity as non-Instantiatable.
+        disable += "Instantiatable"
     }
 }
 
