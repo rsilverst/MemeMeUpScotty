@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meme Me Up Scotty — Redesign Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+/* ====================================================================
+   STARDATE DESIGN SYSTEM — TOKENS
+   ==================================================================== */
+:root {
+  /* Color */
+  --space-900: #0B0E1F;
+  --space-800: #10142A;
+  --space-700: #151A33;
+  --space-600: #1E2542;
+  --space-500: #262C4A;
+  --space-400: #3A4170;
+
+  --plasma-300: #B8FEFF;
+  --plasma-500: #5DFCFF;
+  --plasma-700: #0FB6BC;
+
+  --photon-500: #FF4D8B;
+  --solar-500: #FFD166;
+  --red-500:    #FF6B6B;
+
+  --text-high: #F5F7FF;
+  --text-mid:  #B6BEDF;
+  --text-low:  #8B95C1;
+
+  /* Radius */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* Type */
+  --ff-display: 'Space Grotesk', system-ui, sans-serif;
+  --ff-body:    'Inter', system-ui, sans-serif;
+  --ff-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --ff-caption: 'Anton', 'Impact', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--ff-body);
+  background:
+    radial-gradient(1200px 800px at 80% -10%, rgba(93,252,255,0.07), transparent 60%),
+    radial-gradient(900px 700px at -10% 110%, rgba(255,77,139,0.06), transparent 55%),
+    var(--space-900);
+  color: var(--text-high);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ====================================================================
+   DEMO SHELL
+   ==================================================================== */
+.demo-header {
+  padding: 40px 48px 24px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.demo-header h1 {
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.demo-header h1 .accent {
+  color: var(--plasma-500);
+}
+.demo-header .sub {
+  color: var(--text-low);
+  font-size: 13px;
+  font-family: var(--ff-mono);
+  letter-spacing: 0.02em;
+}
+
+.demo-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: var(--space-700);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-pill);
+  max-width: max-content;
+  margin: 8px auto 32px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.demo-tabs button {
+  font-family: var(--ff-body);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-mid);
+  border: none;
+  cursor: pointer;
+  transition: all 160ms ease;
+  letter-spacing: 0.01em;
+}
+.demo-tabs button:hover { color: var(--text-high); }
+.demo-tabs button.active {
+  background: var(--plasma-500);
+  color: var(--space-900);
+  font-weight: 600;
+}
+
+.stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 20px 80px;
+  min-height: 60vh;
+}
+
+/* ====================================================================
+   PHONE DEVICE FRAME
+   ==================================================================== */
+.device {
+  width: 380px;
+  height: 820px;
+  background: var(--space-900);
+  border-radius: 48px;
+  padding: 14px;
+  border: 1px solid var(--space-500);
+  box-shadow:
+    0 30px 80px -20px rgba(93, 252, 255, 0.08),
+    0 60px 120px -40px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  position: relative;
+  flex-shrink: 0;
+}
+.device-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 36px;
+  background: var(--space-900);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tablet device */
+.device.tablet {
+  width: 980px;
+  height: 700px;
+  border-radius: 36px;
+  padding: 12px;
+}
+.device.tablet .device-screen {
+  border-radius: 26px;
+}
+
+/* ====================================================================
+   APP CHROME — TOP BAR
+   ==================================================================== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+  position: relative;
+}
+.topbar .title {
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--text-high) 30%, var(--plasma-500) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.topbar .icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--space-500);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-mid);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ====================================================================
+   CANVAS
+   ==================================================================== */
+.canvas-wrap {
+  padding: 8px 16px 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--space-700);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--space-500);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The "AI image" — purely CSS/SVG composition */
+.fake-image {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(180px 180px at 65% 40%, rgba(255, 209, 102, 0.35), transparent 65%),
+    radial-gradient(280px 280px at 30% 70%, rgba(255, 77, 139, 0.30), transparent 70%),
+    radial-gradient(400px 320px at 50% 50%, rgba(93, 252, 255, 0.10), transparent 75%),
+    linear-gradient(170deg, #1a1f3e 0%, #2a1f4a 50%, #0f1024 100%);
+}
+.fake-image::after {
+  /* Film grain */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  opacity: 0.10;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.cat-svg {
+  position: relative;
+  width: 60%;
+  z-index: 1;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.5));
+}
+
+/* Meme captions */
+.caption {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--ff-caption);
+  font-weight: 400; /* Anton is a single weight */
+  color: white;
+  -webkit-text-stroke: 2.5px black;
+  text-shadow:
+    2px 2px 0 black, -2px -2px 0 black,
+    2px -2px 0 black, -2px 2px 0 black;
+  letter-spacing: 0.02em;
+  font-size: 38px;
+  line-height: 1;
+  text-align: center;
+  z-index: 5;
+  user-select: none;
+  white-space: nowrap;
+}
+.caption.top    { top: 16px; }
+.caption.bottom { bottom: 16px; }
+
+/* SELECTED text box state */
+.caption.selected {
+  outline: 1.5px dashed var(--plasma-500);
+  outline-offset: 8px;
+  border-radius: 2px;
+  animation: dashChase 14s linear infinite;
+}
+.caption.selected .selection-toolbar {
+  position: absolute;
+  top: calc(100% + 18px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  background: var(--space-600);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-pill);
+  padding: 6px 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.caption.selected .selection-toolbar button {
+  font-family: var(--ff-body);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text-high);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  border: none;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.caption.selected .selection-toolbar button:hover {
+  background: var(--space-500);
+}
+.caption.selected .selection-toolbar button.delete {
+  color: var(--red-500);
+}
+.caption.selected .resize-handle {
+  position: absolute;
+  bottom: -22px;
+  right: -22px;
+  width: 36px;
+  height: 36px;
+  background: var(--plasma-500);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--space-900);
+  font-size: 14px;
+  font-weight: 800;
+  font-family: var(--ff-body);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  cursor: nwse-resize;
+  box-shadow: 0 4px 16px rgba(93, 252, 255, 0.5);
+}
+
+@keyframes dashChase {
+  to { outline-offset: 8px; } /* placeholder so CSS engine animates; real animation below */
+}
+
+/* ====================================================================
+   HUD STRIP
+   ==================================================================== */
+.hud {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: rgba(30, 37, 66, 0.6);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--text-mid);
+  letter-spacing: 0.02em;
+}
+.hud .left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.hud .glyph {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: rgba(93, 252, 255, 0.12);
+  border: 1px solid rgba(93, 252, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+.hud .model-name {
+  color: var(--text-high);
+  font-weight: 600;
+}
+.hud .dot {
+  color: var(--space-400);
+}
+.hud .seed-val {
+  color: var(--plasma-500);
+}
+.hud .right {
+  display: flex;
+  gap: 6px;
+}
+.hud .hud-btn {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--space-500);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-mid);
+}
+.hud .hud-btn:hover {
+  color: var(--plasma-500);
+  border-color: var(--plasma-700);
+}
+
+/* ====================================================================
+   DOCK (BOTTOM PROMPT + ACTIONS)
+   ==================================================================== */
+.dock {
+  padding: 14px 16px 22px;
+  border-top: 1px solid var(--space-500);
+  background: linear-gradient(180deg, rgba(11,14,31,0) 0%, rgba(21,26,51,0.6) 100%);
+  margin-top: 12px;
+}
+.prompt-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--space-700);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.prompt-input:focus-within {
+  border-color: var(--plasma-500);
+  box-shadow: 0 0 0 3px rgba(93,252,255,0.15);
+}
+.prompt-input .prompt-icon {
+  color: var(--text-low);
+  font-size: 14px;
+}
+.prompt-input input,
+.prompt-input textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-high);
+  font-family: var(--ff-body);
+  font-size: 14px;
+  resize: none;
+}
+.prompt-input input::placeholder,
+.prompt-input textarea::placeholder {
+  color: var(--text-low);
+}
+
+.dock-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.btn-primary {
+  position: relative;
+  width: 100%;
+  height: 54px;
+  background: var(--plasma-500);
+  color: var(--space-900);
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  box-shadow:
+    0 8px 24px rgba(93, 252, 255, 0.22),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+  transition: transform 120ms ease, box-shadow 200ms ease;
+}
+.btn-primary:hover {
+  box-shadow:
+    0 10px 32px rgba(93, 252, 255, 0.36),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+.btn-primary .bolt {
+  font-size: 18px;
+}
+.btn-primary.disabled {
+  background: var(--space-600);
+  color: var(--text-low);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn-primary.loading {
+  background: var(--space-600);
+  color: var(--plasma-500);
+}
+.btn-primary.loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(93, 252, 255, 0.25) 50%,
+    transparent 100%
+  );
+  animation: sweep 1.6s ease-in-out infinite;
+}
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+.secondary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.btn-ghost {
+  height: 44px;
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--ff-body);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 160ms ease;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--plasma-700);
+  color: var(--plasma-500);
+}
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ====================================================================
+   EMPTY STATE
+   ==================================================================== */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 24px;
+  gap: 16px;
+}
+.transporter-pad {
+  width: 80px; height: 80px;
+  position: relative;
+}
+.transporter-pad svg {
+  width: 100%; height: 100%;
+}
+.empty-headline {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--text-high);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.empty-sub {
+  font-size: 12px;
+  color: var(--text-low);
+  margin: 0;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.prompt-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+.prompt-chip {
+  font-family: var(--ff-body);
+  font-size: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--space-500);
+  color: var(--text-mid);
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.prompt-chip:hover {
+  border-color: var(--plasma-700);
+  color: var(--plasma-500);
+}
+
+/* ====================================================================
+   LOADING STATE — TRANSPORTER SHIMMER
+   ==================================================================== */
+.shimmer {
+  position: absolute;
+  inset: 0;
+  background: var(--space-800);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.shimmer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 6px,
+      rgba(93, 252, 255, 0.06) 6px,
+      rgba(93, 252, 255, 0.18) 7px,
+      rgba(93, 252, 255, 0.06) 8px,
+      transparent 8px,
+      transparent 14px
+    );
+  animation: scan 2.2s linear infinite;
+}
+.shimmer::after {
+  /* Particle layer using SVG */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, var(--plasma-500) 50%, transparent),
+    radial-gradient(1.5px 1.5px at 80% 50%, var(--plasma-300) 50%, transparent),
+    radial-gradient(2px 2px at 50% 70%, var(--plasma-500) 50%, transparent),
+    radial-gradient(1px 1px at 35% 85%, var(--plasma-300) 50%, transparent),
+    radial-gradient(1.5px 1.5px at 70% 20%, var(--plasma-500) 50%, transparent),
+    radial-gradient(1px 1px at 10% 60%, var(--plasma-300) 50%, transparent);
+  animation: particlesFloat 4s ease-in-out infinite alternate;
+}
+@keyframes scan {
+  from { transform: translateY(-14px); }
+  to   { transform: translateY(0); }
+}
+@keyframes particlesFloat {
+  from { opacity: 0.4; transform: translateY(0px); }
+  to   { opacity: 1; transform: translateY(-12px); }
+}
+.shimmer-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.shimmer-bolt {
+  font-size: 30px;
+  filter: drop-shadow(0 0 8px var(--plasma-500));
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.1); }
+}
+.shimmer-label {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  color: var(--plasma-300);
+  text-transform: uppercase;
+}
+.shimmer-time {
+  font-family: var(--ff-mono);
+  font-size: 13px;
+  color: var(--text-low);
+}
+
+/* ====================================================================
+   ERROR STATE
+   ==================================================================== */
+.error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  text-align: center;
+  gap: 12px;
+  background: var(--space-700);
+}
+.error-icon {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  color: var(--red-500);
+}
+.error-title {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--text-high);
+  margin: 0;
+}
+.error-message {
+  font-size: 13px;
+  color: var(--text-mid);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.error-actions .btn-retry {
+  background: var(--plasma-500);
+  color: var(--space-900);
+  font-family: var(--ff-body);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.error-actions .btn-details {
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--ff-body);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+
+/* ====================================================================
+   MODEL PICKER SHEET
+   ==================================================================== */
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 14, 31, 0.65);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+}
+.sheet {
+  width: 100%;
+  background: var(--space-700);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  border-top: 1px solid var(--space-500);
+  padding: 12px 20px 24px;
+  box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+  max-height: 85%;
+  overflow-y: auto;
+}
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--space-500);
+  border-radius: 2px;
+  margin: 0 auto 18px;
+}
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.sheet-title {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.sheet-close {
+  width: 32px; height: 32px;
+  background: transparent;
+  border: 1px solid var(--space-500);
+  border-radius: 8px;
+  color: var(--text-mid);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.filter-tab {
+  font-size: 12px;
+  font-family: var(--ff-body);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  border: 1px solid var(--space-500);
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.filter-tab.active {
+  background: var(--space-500);
+  color: var(--text-high);
+  border-color: var(--space-400);
+}
+
+.model-card {
+  display: flex;
+  gap: 14px;
+  padding: 14px 14px 14px 18px;
+  background: var(--space-800);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  margin-bottom: 10px;
+  cursor: pointer;
+  position: relative;
+  transition: all 160ms ease;
+}
+.model-card:hover {
+  border-color: var(--space-400);
+}
+.model-card.selected {
+  border-color: var(--plasma-700);
+  background: linear-gradient(90deg, rgba(93,252,255,0.06) 0%, var(--space-800) 30%);
+}
+.model-card.selected::before {
+  content: "";
+  position: absolute;
+  left: -1px; top: 12px; bottom: 12px;
+  width: 3px;
+  background: var(--plasma-500);
+  border-radius: 2px;
+}
+.model-glyph {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--space-700);
+  border: 1px solid var(--space-500);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.model-card.selected .model-glyph {
+  background: rgba(93,252,255,0.10);
+  border-color: rgba(93,252,255,0.3);
+}
+.model-body {
+  flex: 1;
+}
+.model-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.model-name {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--text-high);
+}
+.model-badge {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  color: var(--plasma-500);
+  padding: 2px 8px;
+  background: rgba(93,252,255,0.1);
+  border-radius: var(--r-pill);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.model-desc {
+  font-size: 12px;
+  color: var(--text-mid);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ====================================================================
+   TABLET LAYOUT
+   ==================================================================== */
+.tablet-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 8px 24px 24px;
+  height: calc(100% - 64px);
+}
+.tablet-layout .canvas-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tablet-layout .canvas {
+  flex: 1;
+  aspect-ratio: auto;
+}
+.tablet-layout .controls-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 8px;
+}
+.field-label {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--text-low);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.field-group .selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--space-700);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text-high);
+  font-size: 14px;
+  gap: 10px;
+}
+.field-group .selector .left {
+  display: flex; align-items: center; gap: 10px;
+}
+.field-group .selector .chev {
+  color: var(--text-low);
+}
+.seed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--space-700);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.seed-row .num {
+  font-family: var(--ff-mono);
+  color: var(--plasma-500);
+  font-size: 14px;
+}
+.seed-row .roll {
+  background: transparent;
+  border: 1px solid var(--space-500);
+  border-radius: 8px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-mid);
+}
+
+/* state visibility */
+.state-view { display: none; }
+.state-view.active { display: block; }
+
+/* Snackbar */
+.snackbar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 200px;
+  background: var(--space-600);
+  border: 1px solid var(--space-500);
+  border-left: 3px solid var(--plasma-500);
+  border-radius: var(--r-md);
+  padding: 12px 18px;
+  font-size: 13px;
+  color: var(--text-high);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  z-index: 30;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.snackbar .icon { color: var(--plasma-500); }
+
+footer.legend {
+  max-width: 900px;
+  margin: 0 auto 60px;
+  padding: 0 24px;
+  color: var(--text-low);
+  font-size: 12px;
+  font-family: var(--ff-mono);
+  text-align: center;
+  line-height: 1.7;
+}
+footer.legend strong { color: var(--text-mid); }
+</style>
+</head>
+<body>
+
+<header class="demo-header">
+  <h1>MEME ME UP <span class="accent">SCOTTY</span> — Redesign Mockup</h1>
+  <span class="sub">stardate / design system v0.1</span>
+</header>
+
+<nav class="demo-tabs" id="tabs">
+  <button data-state="empty"        class="active">Empty</button>
+  <button data-state="loading">Energizing…</button>
+  <button data-state="success">Success</button>
+  <button data-state="text-selected">Text Selected</button>
+  <button data-state="success-saved">Saved Toast</button>
+  <button data-state="error">Error</button>
+  <button data-state="picker">Model Picker</button>
+  <button data-state="tablet">Tablet view</button>
+</nav>
+
+<main class="stage" id="stage">
+
+<!-- ======================================================
+     SHARED PHONE FRAME — content swapped by data-state
+     ====================================================== -->
+
+<!-- EMPTY STATE -->
+<div class="device state-view active" data-view="empty">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="empty-state">
+          <div class="transporter-pad">
+            <svg viewBox="0 0 80 80" fill="none">
+              <ellipse cx="40" cy="64" rx="32" ry="6" fill="rgba(93,252,255,0.15)" stroke="var(--plasma-500)" stroke-width="1"/>
+              <ellipse cx="40" cy="64" rx="22" ry="4" fill="rgba(93,252,255,0.25)" stroke="var(--plasma-500)" stroke-width="0.5"/>
+              <line x1="20" y1="14" x2="20" y2="60" stroke="var(--plasma-500)" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>
+              <line x1="60" y1="14" x2="60" y2="60" stroke="var(--plasma-500)" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>
+              <line x1="40" y1="8"  x2="40" y2="58" stroke="var(--plasma-500)" stroke-width="1" stroke-dasharray="2 3" opacity="0.9"/>
+              <circle cx="40" cy="64" r="2" fill="var(--plasma-300)"/>
+            </svg>
+          </div>
+          <p class="empty-headline">Tell us what to materialize.</p>
+          <p class="empty-sub">try one of these</p>
+          <div class="prompt-chips">
+            <button class="prompt-chip">a corgi as the captain</button>
+            <button class="prompt-chip">spock holding a banana</button>
+            <button class="prompt-chip">the bridge, but tiny</button>
+          </div>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="left">
+          <div class="glyph">🜂</div>
+          <span class="model-name">Juggernaut</span>
+          <span class="dot">·</span>
+          <span>seed</span>
+          <span class="seed-val">—</span>
+        </div>
+        <div class="right">
+          <button class="hud-btn" title="Re-roll seed">🎲</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock">
+      <label class="prompt-input">
+        <span class="prompt-icon">✎</span>
+        <input type="text" placeholder="Describe your meme…" />
+      </label>
+      <div class="dock-actions">
+        <button class="btn-primary">
+          <span class="bolt">⚡</span> Energize
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost" disabled>⤓ Save</button>
+          <button class="btn-ghost" disabled>↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING STATE -->
+<div class="device state-view" data-view="loading">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="shimmer">
+          <div class="shimmer-content">
+            <div class="shimmer-bolt">⚡</div>
+            <div class="shimmer-label">Materializing</div>
+            <div class="shimmer-time">~12s</div>
+          </div>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="left">
+          <div class="glyph">🜂</div>
+          <span class="model-name">Juggernaut</span>
+          <span class="dot">·</span>
+          <span>seed</span>
+          <span class="seed-val">0428710</span>
+        </div>
+        <div class="right">
+          <button class="hud-btn" title="Re-roll seed">🎲</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock">
+      <label class="prompt-input">
+        <span class="prompt-icon">✎</span>
+        <input type="text" value="a cat astronaut on the moon" />
+      </label>
+      <div class="dock-actions">
+        <button class="btn-primary loading">
+          <span>Energizing…</span>
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost" disabled>⤓ Save</button>
+          <button class="btn-ghost" disabled>↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS STATE -->
+<div class="device state-view" data-view="success">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="fake-image"></div>
+        <svg class="cat-svg" viewBox="0 0 200 200">
+          <!-- Stars -->
+          <circle cx="30" cy="30" r="1" fill="#fff" opacity="0.8"/>
+          <circle cx="170" cy="40" r="1.2" fill="#fff" opacity="0.6"/>
+          <circle cx="180" cy="160" r="0.8" fill="#fff" opacity="0.9"/>
+          <circle cx="25" cy="170" r="1" fill="#fff" opacity="0.7"/>
+          <!-- Helmet glow -->
+          <circle cx="100" cy="100" r="78" fill="rgba(93,252,255,0.06)" stroke="rgba(93,252,255,0.4)" stroke-width="1.5"/>
+          <!-- Helmet reflection -->
+          <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.12)"/>
+          <!-- Cat -->
+          <g fill="#13182e">
+            <polygon points="62,72 76,42 88,72"/>
+            <polygon points="112,72 124,42 138,72"/>
+            <circle cx="100" cy="102" r="42"/>
+          </g>
+          <!-- Eyes -->
+          <ellipse cx="86" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+          <ellipse cx="114" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+          <circle cx="86" cy="94" r="1.5" fill="white"/>
+          <circle cx="114" cy="94" r="1.5" fill="white"/>
+          <!-- Nose -->
+          <polygon points="100,112 96,118 104,118" fill="#FF4D8B"/>
+          <!-- Mouth -->
+          <path d="M 100 118 Q 92 126 88 122" stroke="#13182e" stroke-width="1.5" fill="none"/>
+          <path d="M 100 118 Q 108 126 112 122" stroke="#13182e" stroke-width="1.5" fill="none"/>
+          <!-- Whiskers -->
+          <line x1="70" y1="116" x2="55" y2="112" stroke="#13182e" stroke-width="1.2"/>
+          <line x1="70" y1="120" x2="55" y2="122" stroke="#13182e" stroke-width="1.2"/>
+          <line x1="130" y1="116" x2="145" y2="112" stroke="#13182e" stroke-width="1.2"/>
+          <line x1="130" y1="120" x2="145" y2="122" stroke="#13182e" stroke-width="1.2"/>
+        </svg>
+        <div class="caption top">I CAN HAS</div>
+        <div class="caption bottom">WARP DRIVE?</div>
+      </div>
+      <div class="hud">
+        <div class="left">
+          <div class="glyph">🜂</div>
+          <span class="model-name">Juggernaut</span>
+          <span class="dot">·</span>
+          <span>seed</span>
+          <span class="seed-val">0428710</span>
+        </div>
+        <div class="right">
+          <button class="hud-btn" title="Re-roll seed">🎲</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock">
+      <label class="prompt-input">
+        <span class="prompt-icon">✎</span>
+        <input type="text" value="a cat astronaut on the moon" />
+      </label>
+      <div class="dock-actions">
+        <button class="btn-primary">
+          <span class="bolt">⚡</span> Energize Again
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost">⤓ Save</button>
+          <button class="btn-ghost">↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TEXT BOX SELECTED -->
+<div class="device state-view" data-view="text-selected">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="fake-image"></div>
+        <svg class="cat-svg" viewBox="0 0 200 200">
+          <circle cx="30" cy="30" r="1" fill="#fff" opacity="0.8"/>
+          <circle cx="170" cy="40" r="1.2" fill="#fff" opacity="0.6"/>
+          <circle cx="180" cy="160" r="0.8" fill="#fff" opacity="0.9"/>
+          <circle cx="25" cy="170" r="1" fill="#fff" opacity="0.7"/>
+          <circle cx="100" cy="100" r="78" fill="rgba(93,252,255,0.06)" stroke="rgba(93,252,255,0.4)" stroke-width="1.5"/>
+          <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.12)"/>
+          <g fill="#13182e">
+            <polygon points="62,72 76,42 88,72"/>
+            <polygon points="112,72 124,42 138,72"/>
+            <circle cx="100" cy="102" r="42"/>
+          </g>
+          <ellipse cx="86" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+          <ellipse cx="114" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+          <circle cx="86" cy="94" r="1.5" fill="white"/>
+          <circle cx="114" cy="94" r="1.5" fill="white"/>
+          <polygon points="100,112 96,118 104,118" fill="#FF4D8B"/>
+          <path d="M 100 118 Q 92 126 88 122" stroke="#13182e" stroke-width="1.5" fill="none"/>
+          <path d="M 100 118 Q 108 126 112 122" stroke="#13182e" stroke-width="1.5" fill="none"/>
+          <line x1="70" y1="116" x2="55" y2="112" stroke="#13182e" stroke-width="1.2"/>
+          <line x1="70" y1="120" x2="55" y2="122" stroke="#13182e" stroke-width="1.2"/>
+          <line x1="130" y1="116" x2="145" y2="112" stroke="#13182e" stroke-width="1.2"/>
+          <line x1="130" y1="120" x2="145" y2="122" stroke="#13182e" stroke-width="1.2"/>
+        </svg>
+        <div class="caption top selected">
+          I CAN HAS
+          <div class="selection-toolbar">
+            <button>✎ Edit</button>
+            <button class="delete">✕ Delete</button>
+          </div>
+          <div class="resize-handle">⤡</div>
+        </div>
+        <div class="caption bottom">WARP DRIVE?</div>
+      </div>
+      <div class="hud">
+        <div class="left">
+          <div class="glyph">🜂</div>
+          <span class="model-name">Juggernaut</span>
+          <span class="dot">·</span>
+          <span>seed</span>
+          <span class="seed-val">0428710</span>
+        </div>
+        <div class="right">
+          <button class="hud-btn">🎲</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock">
+      <label class="prompt-input">
+        <span class="prompt-icon">✎</span>
+        <input type="text" value="a cat astronaut on the moon" />
+      </label>
+      <div class="dock-actions">
+        <button class="btn-primary">
+          <span class="bolt">⚡</span> Energize Again
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost">⤓ Save</button>
+          <button class="btn-ghost">↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS WITH SAVED SNACKBAR -->
+<div class="device state-view" data-view="success-saved">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="fake-image"></div>
+        <svg class="cat-svg" viewBox="0 0 200 200">
+          <circle cx="30" cy="30" r="1" fill="#fff" opacity="0.8"/>
+          <circle cx="170" cy="40" r="1.2" fill="#fff" opacity="0.6"/>
+          <circle cx="100" cy="100" r="78" fill="rgba(93,252,255,0.06)" stroke="rgba(93,252,255,0.4)" stroke-width="1.5"/>
+          <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.12)"/>
+          <g fill="#13182e">
+            <polygon points="62,72 76,42 88,72"/>
+            <polygon points="112,72 124,42 138,72"/>
+            <circle cx="100" cy="102" r="42"/>
+          </g>
+          <ellipse cx="86" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+          <ellipse cx="114" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+          <polygon points="100,112 96,118 104,118" fill="#FF4D8B"/>
+        </svg>
+        <div class="caption top">I CAN HAS</div>
+        <div class="caption bottom">WARP DRIVE?</div>
+      </div>
+      <div class="hud">
+        <div class="left">
+          <div class="glyph">🜂</div>
+          <span class="model-name">Juggernaut</span>
+          <span class="dot">·</span>
+          <span>seed</span>
+          <span class="seed-val">0428710</span>
+        </div>
+        <div class="right">
+          <button class="hud-btn">🎲</button>
+        </div>
+      </div>
+    </div>
+    <div class="snackbar">
+      <span class="icon">✓</span>
+      <span>Beamed to your gallery.</span>
+    </div>
+    <div class="dock">
+      <label class="prompt-input">
+        <span class="prompt-icon">✎</span>
+        <input type="text" value="a cat astronaut on the moon" />
+      </label>
+      <div class="dock-actions">
+        <button class="btn-primary">
+          <span class="bolt">⚡</span> Energize Again
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost">⤓ Save</button>
+          <button class="btn-ghost">↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ERROR STATE -->
+<div class="device state-view" data-view="error">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="error">
+          <div class="error-icon">⚠</div>
+          <h3 class="error-title">Out of dilithium.</h3>
+          <p class="error-message">You're out of Replicate credit. Add some at replicate.com/account/billing.</p>
+          <div class="error-actions">
+            <button class="btn-retry">↻ Try again</button>
+            <button class="btn-details">Details</button>
+          </div>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="left">
+          <div class="glyph">🜂</div>
+          <span class="model-name">Juggernaut</span>
+          <span class="dot">·</span>
+          <span>seed</span>
+          <span class="seed-val">0428710</span>
+        </div>
+        <div class="right">
+          <button class="hud-btn">🎲</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock">
+      <label class="prompt-input">
+        <span class="prompt-icon">✎</span>
+        <input type="text" value="a cat astronaut on the moon" />
+      </label>
+      <div class="dock-actions">
+        <button class="btn-primary">
+          <span class="bolt">⚡</span> Energize
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost" disabled>⤓ Save</button>
+          <button class="btn-ghost" disabled>↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODEL PICKER -->
+<div class="device state-view" data-view="picker">
+  <div class="device-screen">
+    <div class="topbar">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas">
+        <div class="fake-image" style="opacity: 0.4;"></div>
+      </div>
+      <div class="hud"></div>
+    </div>
+
+    <div class="sheet-scrim">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h2 class="sheet-title">Choose engine</h2>
+          <button class="sheet-close">✕</button>
+        </div>
+        <div class="filter-tabs">
+          <button class="filter-tab active">All</button>
+          <button class="filter-tab">Realism</button>
+          <button class="filter-tab">Stylized</button>
+        </div>
+
+        <div class="model-card selected">
+          <div class="model-glyph">🜂</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">Juggernaut XL</div>
+              <div class="model-badge">Active</div>
+            </div>
+            <p class="model-desc">Versatile workhorse. Lightning-fast generation.</p>
+          </div>
+        </div>
+
+        <div class="model-card">
+          <div class="model-glyph">👤</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">Stability AI SDXL</div>
+            </div>
+            <p class="model-desc">Best for celebrities &amp; recognizable faces.</p>
+          </div>
+        </div>
+
+        <div class="model-card">
+          <div class="model-glyph">📷</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">RealVis XL Turbo</div>
+            </div>
+            <p class="model-desc">Photorealism specialist. Portraits, lighting, skin.</p>
+          </div>
+        </div>
+
+        <div class="model-card">
+          <div class="model-glyph">⚡</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">Flux Schnell</div>
+            </div>
+            <p class="model-desc">Highest fidelity. No public figures. Best prompt obedience.</p>
+          </div>
+        </div>
+
+        <div class="model-card">
+          <div class="model-glyph">🌅</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">DreamShaper XL Lightning</div>
+            </div>
+            <p class="model-desc">Alternative realism — warmer palette, softer skin.</p>
+          </div>
+        </div>
+
+        <div class="model-card">
+          <div class="model-glyph">🎨</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">Blue Pencil XL</div>
+            </div>
+            <p class="model-desc">Anime &amp; illustration.</p>
+          </div>
+        </div>
+
+        <div class="model-card">
+          <div class="model-glyph">🖼</div>
+          <div class="model-body">
+            <div class="model-title-row">
+              <div class="model-name">Proteus v0.5</div>
+            </div>
+            <p class="model-desc">Painterly, fine-art texture.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLET VIEW -->
+<div class="device tablet state-view" data-view="tablet">
+  <div class="device-screen">
+    <div class="topbar" style="padding: 18px 24px 8px;">
+      <div class="title">Meme Me Up Scotty</div>
+      <div class="icon-btn">⋯</div>
+    </div>
+    <div class="tablet-layout">
+      <div class="canvas-col">
+        <div class="canvas">
+          <div class="fake-image"></div>
+          <svg class="cat-svg" viewBox="0 0 200 200" style="width: 45%;">
+            <circle cx="30" cy="30" r="1" fill="#fff" opacity="0.8"/>
+            <circle cx="170" cy="40" r="1.2" fill="#fff" opacity="0.6"/>
+            <circle cx="180" cy="160" r="0.8" fill="#fff" opacity="0.9"/>
+            <circle cx="25" cy="170" r="1" fill="#fff" opacity="0.7"/>
+            <circle cx="100" cy="100" r="78" fill="rgba(93,252,255,0.06)" stroke="rgba(93,252,255,0.4)" stroke-width="1.5"/>
+            <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.12)"/>
+            <g fill="#13182e">
+              <polygon points="62,72 76,42 88,72"/>
+              <polygon points="112,72 124,42 138,72"/>
+              <circle cx="100" cy="102" r="42"/>
+            </g>
+            <ellipse cx="86" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+            <ellipse cx="114" cy="98" rx="4" ry="9" fill="#5DFCFF"/>
+            <circle cx="86" cy="94" r="1.5" fill="white"/>
+            <circle cx="114" cy="94" r="1.5" fill="white"/>
+            <polygon points="100,112 96,118 104,118" fill="#FF4D8B"/>
+            <path d="M 100 118 Q 92 126 88 122" stroke="#13182e" stroke-width="1.5" fill="none"/>
+            <path d="M 100 118 Q 108 126 112 122" stroke="#13182e" stroke-width="1.5" fill="none"/>
+          </svg>
+          <div class="caption top" style="font-size: 46px;">I CAN HAS</div>
+          <div class="caption bottom" style="font-size: 46px;">WARP DRIVE?</div>
+        </div>
+        <div class="hud">
+          <div class="left">
+            <div class="glyph">🜂</div>
+            <span class="model-name">Juggernaut</span>
+            <span class="dot">·</span>
+            <span>seed</span>
+            <span class="seed-val">0428710</span>
+          </div>
+          <div class="right">
+            <button class="hud-btn">🎲</button>
+          </div>
+        </div>
+      </div>
+      <div class="controls-col">
+        <div class="field-group">
+          <div class="field-label">Prompt</div>
+          <div class="prompt-input" style="padding: 14px;">
+            <span class="prompt-icon">✎</span>
+            <textarea rows="3" style="font-family: var(--ff-body); font-size: 14px;">a cat astronaut on the moon</textarea>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Engine</div>
+          <div class="selector">
+            <div class="left">
+              <div class="glyph" style="width:24px;height:24px;border-radius:6px;background:rgba(93,252,255,0.12);border:1px solid rgba(93,252,255,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;">🜂</div>
+              <span>Juggernaut XL</span>
+            </div>
+            <span class="chev">▾</span>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Seed</div>
+          <div class="seed-row">
+            <span class="num">0428710</span>
+            <button class="roll">🎲</button>
+          </div>
+        </div>
+        <button class="btn-primary" style="margin-top: 8px;">
+          <span class="bolt">⚡</span> Energize Again
+        </button>
+        <div class="secondary-row">
+          <button class="btn-ghost">⤓ Save</button>
+          <button class="btn-ghost">↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<footer class="legend">
+  <strong>Stardate v0.1</strong> &nbsp;·&nbsp; plasma cyan on deep space &nbsp;·&nbsp;
+  Space Grotesk / Inter / JetBrains Mono / Anton &nbsp;·&nbsp;
+  All functionality preserved 1:1 with current Compose app.
+</footer>
+
+<script>
+  const tabs = document.querySelectorAll('#tabs button');
+  const views = document.querySelectorAll('.state-view');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.state;
+      views.forEach(v => {
+        v.classList.toggle('active', v.dataset.view === target);
+      });
+    });
+  });
+</script>
+</body>
+</html>

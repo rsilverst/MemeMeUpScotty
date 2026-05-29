@@ -1,24 +1,81 @@
 <resources>
     <string name="app_name">Meme Me Up Scotty</string>
-    <string name="prompt_placeholder">Enter a meme prompt&#8230;</string>
+
+    <!-- Prompt -->
+    <string name="prompt_placeholder">Describe your meme&#8230;</string>
+
+    <!-- Idle / empty state -->
+    <string name="idle_instruction">Tell us what to materialize.</string>
+    <string name="idle_try_one">Try one of these</string>
+    <string name="suggested_prompt_1">a corgi as the captain</string>
+    <string name="suggested_prompt_2">spock holding a banana</string>
+    <string name="suggested_prompt_3">the bridge, but tiny</string>
+
+    <!-- Primary CTA -->
+    <string name="generate">Energize</string>
+    <string name="regenerate">Energize Again</string>
+    <string name="generating">Energizing&#8230;</string>
+    <string name="materializing">Materializing</string>
+
+    <!-- Secondary actions -->
     <string name="save">Save</string>
     <string name="share">Share</string>
-    <string name="nothing_to_save">Nothing to save</string>
-    <string name="nothing_to_share">Nothing to share</string>
-    <string name="saved_to_gallery">Saved to Gallery</string>
+
+    <!-- Snackbar messages -->
+    <string name="nothing_to_save">Nothing to save yet.</string>
+    <string name="nothing_to_share">Nothing to share yet.</string>
+    <string name="saved_to_gallery">Beamed to your gallery.</string>
     <string name="failed_to_save">Failed to save</string>
     <string name="failed_to_share">Failed to share</string>
     <string name="storage_permission_required">Storage permission is required to save images</string>
-    <string name="idle_instruction">Enter a prompt and press Generate</string>
-    <string name="regenerate">Regenerate</string>
-    <string name="generate">Generate</string>
     <string name="error_message_format">Error: %1$s</string>
+
+    <!-- Themed error headlines -->
+    <string name="error_title_generic">Something went wrong.</string>
+    <string name="error_title_auth">Subspace link rejected.</string>
+    <string name="error_title_quota">Out of dilithium.</string>
+    <string name="error_title_not_found">That engine isn\'t available.</string>
+    <string name="error_title_rate_limit">Engineering\'s overloaded.</string>
+    <string name="error_title_server">Replicate\'s having a problem.</string>
+    <string name="error_try_again">Try again</string>
+
+    <!-- Captions -->
     <string name="default_top_text">TOP TEXT</string>
     <string name="default_bottom_text">BOTTOM TEXT</string>
+
+    <!-- Share chooser -->
     <string name="share_chooser_title">Share Meme</string>
-    <string name="delete_text_box">Remove this text box</string>
-    <string name="resize_text_box">Resize this text box</string>
-    <string name="move_text_box">Move this text box</string>
+
+    <!-- Text box controls -->
+    <string name="delete_text_box">Remove text box</string>
+    <string name="resize_text_box">Resize text box</string>
+    <string name="move_text_box">Move text box</string>
+    <string name="edit_text_box">Edit text</string>
     <string name="add_top_text">Add top text</string>
     <string name="add_bottom_text">Add bottom text</string>
+
+    <!-- Model picker -->
+    <string name="choose_engine">Choose engine</string>
+    <string name="model_active">Active</string>
+    <string name="filter_all">All</string>
+    <string name="filter_realism">Realism</string>
+    <string name="filter_stylized">Stylized</string>
+
+    <string name="model_juggernaut_name">Juggernaut XL</string>
+    <string name="model_juggernaut_desc">Versatile workhorse. Lightning-fast generation.</string>
+    <string name="model_stability_name">Stability AI SDXL</string>
+    <string name="model_stability_desc">Best for celebrities &amp; recognizable faces.</string>
+    <string name="model_realvis_name">RealVis XL Turbo</string>
+    <string name="model_realvis_desc">Photorealism specialist. Portraits, lighting, skin.</string>
+    <string name="model_flux_name">Flux Schnell</string>
+    <string name="model_flux_desc">Highest fidelity. No public figures. Best prompt obedience.</string>
+    <string name="model_dreamshaper_name">DreamShaper XL Lightning</string>
+    <string name="model_dreamshaper_desc">Alternative realism — warmer palette, softer skin.</string>
+    <string name="model_bluepencil_name">Blue Pencil XL</string>
+    <string name="model_bluepencil_desc">Anime &amp; illustration.</string>
+    <string name="model_proteus_name">Proteus v0.5</string>
+    <string name="model_proteus_desc">Painterly, fine-art texture.</string>
+
+    <!-- HUD -->
+    <string name="hud_reroll">Re-roll seed (regenerate)</string>
 </resources>

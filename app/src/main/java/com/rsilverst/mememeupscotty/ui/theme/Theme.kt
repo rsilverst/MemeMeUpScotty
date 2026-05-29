@@ -1,56 +1,52 @@
 package com.rsilverst.mememeupscotty.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+private val StardateColorScheme = darkColorScheme(
+    primary           = Plasma500,
+    onPrimary         = Space900,
+    primaryContainer  = Plasma700,
+    onPrimaryContainer = Space900,
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    secondary         = Photon500,
+    onSecondary       = Space900,
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    tertiary          = Solar500,
+    onTertiary        = Space900,
+
+    background        = Space900,
+    onBackground      = TextHigh,
+
+    surface           = Space700,
+    onSurface         = TextHigh,
+    surfaceVariant    = Space600,
+    onSurfaceVariant  = TextMid,
+
+    surfaceContainerLowest = Space800,
+    surfaceContainerLow    = Space700,
+    surfaceContainer       = Space600,
+    surfaceContainerHigh   = Space500,
+    surfaceContainerHighest = Space400,
+
+    outline           = Space500,
+    outlineVariant    = Space600,
+
+    error             = Red500,
+    onError           = Space900,
+
+    inverseSurface    = Space500,
+    inverseOnSurface  = TextHigh,
+    inversePrimary    = Plasma700
 )
 
 @Composable
 fun MemeMeUpScottyTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = StardateColorScheme,
         typography = Typography,
         content = content
     )
