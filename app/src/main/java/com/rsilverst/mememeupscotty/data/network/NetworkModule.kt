@@ -8,7 +8,10 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkModule {
-    private const val BASE_URL = "https://api.replicate.com/"
+    // Sourced from BuildConfig so a future proxy (see CODE_REVIEW.md A1) can
+    // be swapped in via local.properties without touching code. Defaults to
+    // api.replicate.com.
+    private val BASE_URL = BuildConfig.REPLICATE_BASE_URL
 
     // Body-level logging includes request/response bodies and is too noisy
     // (and a small perf hit) for release. Authorization headers are also
@@ -21,10 +24,12 @@ object NetworkModule {
         }
     }
 
-    // Replicate uses `Token` auth scheme, not `Bearer`.
+    // Replicate uses `Token` auth scheme, not `Bearer`. When BASE_URL is
+    // pointed at a proxy, the proxy is expected to either ignore this header
+    // and inject its own auth, or rewrite it on the way to Replicate.
     private val authInterceptor = okhttp3.Interceptor { chain ->
         val request = chain.request().newBuilder()
-            .addHeader("Authorization", "Token ${com.rsilverst.mememeupscotty.BuildConfig.REPLICATE_API_TOKEN}")
+            .addHeader("Authorization", "Token ${BuildConfig.REPLICATE_API_TOKEN}")
             .build()
         chain.proceed(request)
     }

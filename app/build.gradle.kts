@@ -13,6 +13,12 @@ if (localPropertiesFile.exists()) {
 }
 val replicateToken = localProperties.getProperty("REPLICATE_API_TOKEN") ?: System.getenv("REPLICATE_API_TOKEN") ?: "YOUR_ACCESS_TOKEN"
 
+// Configurable base URL so a future proxy (see CODE_REVIEW.md item A1) can be
+// swapped in with one local.properties line, without touching code.
+val replicateBaseUrl = localProperties.getProperty("REPLICATE_BASE_URL")
+    ?: System.getenv("REPLICATE_BASE_URL")
+    ?: "https://api.replicate.com/"
+
 if (replicateToken.isBlank() || replicateToken == "YOUR_ACCESS_TOKEN") {
     logger.warn("""
 
@@ -30,6 +36,9 @@ if (replicateToken.isBlank() || replicateToken == "YOUR_ACCESS_TOKEN") {
 
         Optional: override the default model (sdxl-based/juggernaut-xl-lightning) with
            REPLICATE_MODEL_ID=owner/model
+
+        Optional: point at a proxy instead of api.replicate.com with
+           REPLICATE_BASE_URL=https://your-proxy.example.com/
         ===================================================================================
 
     """.trimIndent())
@@ -48,6 +57,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "REPLICATE_API_TOKEN", "\"$replicateToken\"")
+        buildConfigField("String", "REPLICATE_BASE_URL", "\"$replicateBaseUrl\"")
     }
 
     buildTypes {

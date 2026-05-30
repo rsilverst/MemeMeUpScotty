@@ -13,8 +13,9 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | PR | Items | Date | Notes |
 |---|---|---|---|
 | **PR 1** | A3, A4, A5, C4 | 2026-05-29 | All four landed as recommended, **plus one unplanned addition**: `lint { disable += "Instantiatable" }` in `app/build.gradle.kts` to work around an AGP-alpha lint false positive on `ComponentActivity`. Should be removed once G1 (move off alpha AGP) lands. Release build (`assembleRelease`) and unit tests verified green. A4 implementation: chose the simpler `allowBackup="false"` route over populating the rule files; the `fullBackupContent`/`dataExtractionRules` manifest attrs were left in place but are inert. |
+| **PR 2** | A1 *(interim)* | 2026-05-29 | **A2 and E10 were attempted and reverted same-day** on user feedback. Both were Play-Store generative-AI-policy items that do not apply to a personal-only build that the original brief explicitly said should have "no content moderation". A1 deviated from the "stand up a proxy" recommendation — proxy involves a hosting / billing decision out of scope for code work. Instead landed the **documented personal-build branch** the review offered as the alternative: new `README.md` with an explicit "Distribution status" section, plus a `REPLICATE_BASE_URL` BuildConfig seam (default `https://api.replicate.com/`) so a future proxy can be swapped in with one line in `local.properties`. A1 should be re-opened and a proxy stood up before any distribution. **A2 reverted:** restored `disable_safety_checker = true`. **E10 reverted:** removed the TopAppBar overflow + "Report content" menu item + supporting strings — pointless on a single-user app. Going forward, skip review items framed around Play Store generative-AI policy unless the distribution stance changes. Release build + unit tests green. |
 
-Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; (blank) = not yet started.
+Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
 
 ---
 
@@ -36,7 +37,7 @@ The app does what the brief asked: prompt → AI image → caption → save/shar
 
 These block any public distribution. Even for internal/sideload, they are real risks.
 
-### A1. Replicate API token is compiled into the APK [P0]
+### A1. Replicate API token is compiled into the APK [P0] ⚠️ **PARTIAL — INTERIM (PR 2, 2026-05-29)**
 **File:** `app/build.gradle.kts:50`, `data/network/NetworkModule.kt:19`
 
 `REPLICATE_API_TOKEN` is read from `local.properties` and baked into `BuildConfig` as a string constant. Anyone with the APK can extract it with `apktool` or `strings`. Replicate is a billed paid service — token theft becomes the user's bill. This pattern also violates Replicate's ToS (tokens are per-user, not embeddable).
@@ -47,12 +48,21 @@ It is also at risk via auto-backup (see A4).
 - **Personal-only build:** explicitly mark `release { signingConfig = … }` as internal-only, never ship to Play, and document in README.
 - **Distributable:** stand up a thin proxy (Cloudflare Worker, Vercel function, Firebase Function) that holds the token server-side. The app calls the proxy; the proxy calls Replicate. ~50 LOC server, ~10 LOC client change.
 
-### A2. Model-level safety checker is disabled [P0 for distribution / P2 for personal]
+**Implementation note (interim, PR 2):** PR 2 took the **personal-only documented** branch. The token still ships in BuildConfig — this is **not** the full fix; it is a documented interim state.
+- New `README.md` has a "Distribution status — read before sharing" section flagging that the APK must not be distributed and listing what blocks distribution (this item plus A2, A5, A6, E10).
+- A `REPLICATE_BASE_URL` BuildConfig field was added (defaults to `https://api.replicate.com/`, overridable in `local.properties`), so the proxy swap-in is one-line later: point at the proxy URL and the proxy can ignore or rewrite the `Authorization` header.
+- Release signing config is **still not** in place; a separate PR should add a release keystore + `signingConfig` when distribution is imminent.
+
+**Remaining work to close A1:** stand up the proxy, deploy, set `REPLICATE_BASE_URL` to it, optionally drop the `Authorization` header from the OkHttp interceptor if the proxy injects its own.
+
+### A2. Model-level safety checker is disabled [P0 for distribution / P2 for personal] 🚫 **NOT APPLICABLE — personal-build stance (PR 2, 2026-05-29)**
 **File:** `data/repository/ImageRepository.kt:40-43`
 
 `disable_safety_checker = true` is hardcoded. Comment justifies it as "personal/single-user app." Google Play has a Generative AI Apps policy (effective 2024) that requires safety filtering, an in-app reporting mechanism, and a content policy. This combo will trip the policy check on submission.
 
 **Action:** Default to safety-on. Add an internal-only debug toggle if needed. If distributing, also wire an in-app "Report" affordance.
+
+**Implementation note (reverted PR 2, 2026-05-29):** initially removed `disable_safety_checker = true`, but the user pushed back: the original brief explicitly says "no content moderation," and this is a personal-only build that is not being distributed. Restored `disable_safety_checker = true`. **For this app, treat this item as Not Applicable.** Future reviews should skip Play-policy-derived recommendations unless the distribution stance changes.
 
 ### A3. OkHttp body logging is unconditional [P0] ✅ **DONE (PR 1, 2026-05-29)**
 **File:** `data/network/NetworkModule.kt:12-14`
@@ -400,8 +410,10 @@ Replicate models support `num_outputs`. Show a 2×2 grid of options to pick from
 ### E9. No upscaling / output resolution control [P3]
 SDXL outputs are ~1024px. For sharing to print or HD displays, optional 2× upscale via a separate Replicate model would be a nice-to-have.
 
-### E10. No reporting / safety affordance [P0 if shipping]
+### E10. No reporting / safety affordance [P0 if shipping] 🚫 **NOT APPLICABLE — personal-build stance (PR 2, 2026-05-29)**
 Tied to A2. Even with safety on, Play policy expects an in-app "report this" path.
+
+**Implementation note (attempted + reverted PR 2, 2026-05-29):** initially added a `MoreVert` overflow on the `BridgeTopBar` with a "Report content" item that fired a `mailto:` intent. User pushed back: "no fucking reason to have a report content feature." For a single-user personal app this affordance is dead weight (email-yourself-about-your-own-memes). All E10 code reverted: overflow + DropdownMenu removed from `BridgeTopBar`, `onReport` lambda removed from `MemeScreen`, related imports (`Intent`, `Uri`, `ActivityNotFoundException`, `MoreVert`, `Flag`) removed, and the supporting strings (`more_actions`, `report_content`, `report_email`, `report_subject`, `report_body_hint`, `report_no_email_app`) dropped from `strings.xml`. **For this app, treat this item as Not Applicable.**
 
 ### E11. No about/credits/attribution screen [P2]
 Several Replicate models have specific attribution or non-commercial clauses. Compliance + courtesy.
@@ -477,8 +489,8 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 
 | # | Group | Severity | Title |
 |---|---|---|---|
-| A1 | Security | **P0** | API token compiled into APK |
-| A2 | Policy | **P0** (distribution) | Safety checker disabled |
+| A1 | Security | **P0** | ⚠️ API token compiled into APK *(PR 2 interim: documented personal-build + `REPLICATE_BASE_URL` seam; proxy still to do)* |
+| A2 | Policy | **P0** (distribution) | 🚫 Safety checker disabled — N/A for personal build *(PR 2 attempted + reverted)* |
 | A3 | Security | **P0** | ✅ OkHttp body logging in release *(PR 1)* |
 | A4 | Privacy | **P0** | ✅ Auto-backup with no exclusions *(PR 1)* |
 | A5 | Release | **P0** | ⚠️ R8 / ProGuard disabled *(PR 1, +`Instantiatable` lint disable)* |
@@ -531,7 +543,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | E7 | Product | P2 | No draft persistence |
 | E8 | Product | P2 | No batch generation |
 | E9 | Product | P3 | No upscaling |
-| E10 | Policy | **P0** (distribution) | No report-content path |
+| E10 | Policy | **P0** (distribution) | 🚫 No report-content path — N/A for personal build *(PR 2 attempted + reverted)* |
 | E11 | Product | P2 | No attribution screen |
 | E12 | Product | P3 | No analytics |
 | E13 | Legal | P0 | (dup A6) |
@@ -554,7 +566,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 When you're ready to tackle, I'd suggest pairing items so each PR is a coherent slice rather than a grab-bag:
 
 - **PR 1 — Release-block kit:** A3 (logging), A4 (backup), A5 (R8), C4 (printStackTrace). ✅ **landed 2026-05-29**
-- **PR 2 — Token + safety strategy:** A1, A2, E10 (proxy + safety + report path go together).
+- **PR 2 — Token + safety strategy:** A1 *(interim)*. A2 and E10 marked Not Applicable for this personal-only build. ⚠️ **landed 2026-05-29 — A1 is interim only.** The proxy was not stood up (requires hosting/billing decision); a `REPLICATE_BASE_URL` seam was added so the proxy is a one-line swap when ready.
 - **PR 3 — Split MemeScreen:** B1.
 - **PR 4 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect).
 - **PR 5 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo).
