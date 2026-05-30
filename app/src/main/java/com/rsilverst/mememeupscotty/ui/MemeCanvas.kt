@@ -46,6 +46,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -62,6 +63,7 @@ import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Red500
+import com.rsilverst.mememeupscotty.ui.theme.Solar500
 import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space700
 import com.rsilverst.mememeupscotty.ui.theme.Space800
@@ -311,13 +313,17 @@ private fun LoadingState() {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
+            // 1700ms reads as a calm "computing" rhythm without feeling sluggish;
+            // 2200ms (the original) edges on slow when you're staring at it.
+            animation = tween(1700, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "scan"
     )
-    val pulseAlpha by infinite.animateFloat(
-        initialValue = 0.6f,
+    // Drives both bolt alpha (subtle 0.8 → 1.0 breath) and color (Plasma500 →
+    // Solar500), so the bolt warms into gold at the peak per the mockup.
+    val pulse by infinite.animateFloat(
+        initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing),
@@ -325,6 +331,8 @@ private fun LoadingState() {
         ),
         label = "pulse"
     )
+    val boltColor = lerp(Plasma500, Solar500, pulse)
+    val boltAlpha = 0.8f + 0.2f * pulse
 
     Box(
         modifier = Modifier
@@ -379,7 +387,7 @@ private fun LoadingState() {
             Icon(
                 imageVector = Icons.Filled.Bolt,
                 contentDescription = null,
-                tint = Plasma500.copy(alpha = pulseAlpha),
+                tint = boltColor.copy(alpha = boltAlpha),
                 modifier = Modifier.size(36.dp)
             )
             Spacer(Modifier.height(8.dp))

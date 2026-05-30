@@ -65,7 +65,7 @@ internal fun CompactLayout(
             onRetry = onEnergize
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         HudStrip(
             selectedModel = selectedModel,
@@ -74,7 +74,7 @@ internal fun CompactLayout(
             onReroll = onEnergize
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Dock(
             prompt = prompt,
@@ -136,7 +136,7 @@ internal fun ExpandedLayout(
                 onRetry = onEnergize,
                 modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(20.dp))
             HudStrip(
                 selectedModel = selectedModel,
                 generationState = generationState,
@@ -150,13 +150,14 @@ internal fun ExpandedLayout(
                 .weight(1f)
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             FieldLabel(text = "PROMPT")
             PromptInput(
                 value = prompt,
                 onValueChange = onPromptChange,
-                singleLine = false
+                singleLine = false,
+                minLines = 3
             )
 
             FieldLabel(text = "ENGINE")
@@ -176,7 +177,7 @@ internal fun ExpandedLayout(
             val isLoading = generationState is GenerationState.Loading
             val hasImage = generationState is GenerationState.Success
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 GhostButton(

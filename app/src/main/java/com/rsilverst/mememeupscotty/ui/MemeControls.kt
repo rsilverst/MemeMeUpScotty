@@ -171,12 +171,13 @@ internal fun Dock(
     onShare: () -> Unit
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         PromptInput(
             value = prompt,
             onValueChange = onPromptChange,
-            singleLine = false
+            singleLine = false,
+            minLines = 3
         )
 
         EnergizeButton(
@@ -189,7 +190,7 @@ internal fun Dock(
         val hasImage = generationState is GenerationState.Success
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             GhostButton(
                 icon = Icons.Filled.Download,
@@ -213,10 +214,14 @@ internal fun Dock(
 internal fun PromptInput(
     value: String,
     onValueChange: (String) -> Unit,
-    singleLine: Boolean
+    singleLine: Boolean,
+    minLines: Int = 1
 ) {
     var focused by remember { mutableStateOf(false) }
     val borderColor = if (focused) Plasma500 else Space500
+    // BasicTextField rejects minLines != 1 when singleLine is true. Guard so
+    // a misconfigured call doesn't crash at runtime.
+    val effectiveMinLines = if (singleLine) 1 else minLines
 
     Row(
         modifier = Modifier
@@ -240,6 +245,7 @@ internal fun PromptInput(
             value = value,
             onValueChange = onValueChange,
             singleLine = singleLine,
+            minLines = effectiveMinLines,
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextHigh),
             cursorBrush = SolidColor(Plasma500),
             modifier = Modifier

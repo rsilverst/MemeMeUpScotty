@@ -15,6 +15,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **PR 1** | A3, A4, A5, C4 | 2026-05-29 | All four landed as recommended, **plus one unplanned addition**: `lint { disable += "Instantiatable" }` in `app/build.gradle.kts` to work around an AGP-alpha lint false positive on `ComponentActivity`. Should be removed once G1 (move off alpha AGP) lands. Release build (`assembleRelease`) and unit tests verified green. A4 implementation: chose the simpler `allowBackup="false"` route over populating the rule files; the `fullBackupContent`/`dataExtractionRules` manifest attrs were left in place but are inert. |
 | **PR 2** | A1 *(interim)* | 2026-05-29 | **A2 and E10 were attempted and reverted same-day** on user feedback. Both were Play-Store generative-AI-policy items that do not apply to a personal-only build that the original brief explicitly said should have "no content moderation". A1 deviated from the "stand up a proxy" recommendation — proxy involves a hosting / billing decision out of scope for code work. Instead landed the **documented personal-build branch** the review offered as the alternative: new `README.md` with an explicit "Distribution status" section, plus a `REPLICATE_BASE_URL` BuildConfig seam (default `https://api.replicate.com/`) so a future proxy can be swapped in with one line in `local.properties`. A1 should be re-opened and a proxy stood up before any distribution. **A2 reverted:** restored `disable_safety_checker = true`. **E10 reverted:** removed the TopAppBar overflow + "Report content" menu item + supporting strings — pointless on a single-user app. Going forward, skip review items framed around Play Store generative-AI policy unless the distribution stance changes. Release build + unit tests green. |
 | **PR 3** | B7 + prompt-quality expansion | 2026-05-29 | User asked whether better prompting could reduce real-world artifacts (extra/fused fingers, twin subjects, malformed limbs). Did B7 from the review plus an expanded artifact-focused negative prompt as one PR. Introduced a private `ModelPromptConfig` (positive suffix + negative prompt) in `ImageRepository.kt`, plus a `MODEL_PROMPT_CONFIGS` map keyed by Replicate model id. Photoreal models (Juggernaut, Stability, RealVis, DreamShaper) get a photoreal style suffix + anti-cartoon/anime negatives + the canonical anatomy/duplication negatives. Stylized models (Blue Pencil anime, Proteus painterly) get model-appropriate suffixes and **no** anti-cartoon/anime negatives. Flux Schnell gets a minimal natural-language suffix and **no** negative at all (rectified-flow architecture doesn't use CFG/negatives). Negative term selection is comment-explained inline. Release + unit tests green. Note: this also bumps the original "PR 3 — Split MemeScreen" item from the roadmap → PR 4. |
+| **PR 5** | D18, D19, D20, D21 | 2026-05-29 | UX polish batch from user testing. **D18**: `MemeCanvas.kt::LoadingState` — scan-line tween `2200ms → 1700ms` and replaced the single `pulseAlpha` with a `pulse` (0..1) that drives both `tint = lerp(Plasma500, Solar500, pulse).copy(alpha = 0.8 + 0.2*pulse)`, so the bolt warms to gold at peak per the mockup. **D20**: `PromptInput` gained a `minLines: Int = 1` parameter (guarded so a misconfigured caller with `singleLine = true` cannot crash BasicTextField); `Dock` and `ExpandedLayout` right-column now pass `minLines = 3`. **D19 + D21**: single-pass spacing rework. Canvas → HUD `12dp → 20dp` (both layouts), HUD → Dock `20dp → 24dp`, Dock vertical gap `12dp → 16dp`, expanded right column `18dp → 16dp`, paired Save/Share buttons `10dp → 8dp` (both layouts). `assembleDebug`, `assembleRelease`, `testDebugUnitTest` green. Note: this PR was inserted ahead of the original "PR 5 — Typed errors" item; subsequent PRs renumbered (+1) below. |
 | **PR 4** | B1 | 2026-05-29 | Split the 2,025-line `MemeScreen.kt` into 8 files in `ui/`: `MemeScreen.kt` (324 — root + `MemeContent` state hoisting + topbar + snackbar host), `MemeLayouts.kt` (209 — `CompactLayout`, `ExpandedLayout`, `FieldLabel`), `MemeCanvas.kt` (570 — canvas + idle/loading/error states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (353 — overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (454 — `HudStrip`, `Dock`, `PromptInput`, `EnergizeButton`, `GhostButton`), `ModelPicker.kt` (280 — selector + sheet + card), `ImageModelMetadata.kt` (52 — `shortLabel`/`shortGlyph`/`displayNameRes`/`descriptionRes` extension props on `ImageModel`, now `internal`), `PreviewShell.kt` (53 — shared `PREVIEW_BG`, `PreviewShell`, `PreviewCanvasFrame`). Visibility tightened: composables called cross-file are `internal`, leaf helpers stayed `private`. All previews moved next to their components. Slightly different from the per-component subpackages the original review sketched (kept flat `ui/` for 8 files); the renamed `MemeLayouts.kt` bundles both layouts since they're sibling concerns. Behavior preserved verbatim — caught one subtle drift mid-split (`.clip(CircleShape).background(...)` → `.background(..., CircleShape)` on `ResizeHandle`) and reverted to the original. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
@@ -373,6 +374,28 @@ The stroke is `fontSize * 0.15f`, which gets very thin at small font sizes. On a
 ### D17. Aspect ratio is locked to 1:1 [P1 — see also E1]
 `MemeCanvas` is `aspectRatio(1f)`. Many meme platforms (Instagram landscape, Reels/TikTok 9:16) need other ratios.
 
+### D18. Materialize / loading animation polish [P3] ✅ **DONE (PR 5, 2026-05-29)** *(added 2026-05-29 from user testing)*
+**File:** `ui/MemeCanvas.kt::LoadingState`
+
+Two specific drifts from the mockup observed while running the app:
+1. The scan-line animation feels a touch slow at `tween(2200, easing = LinearEasing)` (line 314). Try ~1600–1800ms — keeps the calm "computing" rhythm but reads more responsive.
+2. The lightning bolt currently pulses Plasma500 (cyan) only — `tint = Plasma500.copy(alpha = pulseAlpha)` at line 382. The mockup pulses **into yellow** (Solar500 from the design tokens) on the breathing cycle. Lerp `tint` between Plasma500 (low pulse) and Solar500 (high pulse), or run two animated values (alpha + color) so the bolt warms to gold at the peak.
+
+### D19. Tight spacing between canvas and HUD strip [P3] ✅ **DONE (PR 5, 2026-05-29)** *(added 2026-05-29 from user testing)*
+**File:** `ui/MemeLayouts.kt`
+
+`CompactLayout` puts a `Spacer(modifier = Modifier.height(12.dp))` between the canvas and the HUD strip (line 68). `ExpandedLayout` does the same at line 139. 12dp reads as cramped against a large canvas tile. Try 20–24dp. Worth eyeballing both compact and expanded together so they stay visually consistent.
+
+### D20. Prompt input should default to multi-line [P2] ✅ **DONE (PR 5, 2026-05-29)** *(added 2026-05-29 from user testing)*
+**File:** `ui/MemeControls.kt::PromptInput`
+
+The `BasicTextField` at line 239 accepts `singleLine` but has no `minLines`. Even though the Dock passes `singleLine = false`, the field renders at 1 line height until the user types enough to wrap, so a fresh empty prompt looks like a one-liner. Add `minLines = 3` (or expose it as a parameter and pass 3 from the Dock, 1 from any future single-line caller) so the field opens at ~3 lines and visually invites a longer prompt.
+
+### D21. Overall spacing audit across fields, pickers, buttons [P3] ✅ **DONE (PR 5, 2026-05-29)** *(added 2026-05-29 from user testing)*
+**Files:** `ui/MemeLayouts.kt`, `ui/MemeControls.kt`, `ui/ModelPicker.kt`
+
+D19 is one instance; this is the broader pass. The dock currently uses `Arrangement.spacedBy(12.dp)` between its rows (PromptInput → Energize → Save/Share row), `Arrangement.spacedBy(18.dp)` in the expanded layout's right column, and 10dp between paired buttons. None of these are wrong individually but they accumulate inconsistently between compact and expanded. Action: take a deliberate pass with a single spacing scale (e.g. 8 / 16 / 24dp) and reapply across `Dock`, `ExpandedLayout` right column, `ModelPickerSheet`, and the inter-row gaps in `CompactLayout`. Easier to do as one PR than dribble.
+
 ---
 
 # Group E — PM / Product Gaps *(PM Lead)*
@@ -540,6 +563,10 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | D15 | A11y | P2 | Semantics gaps |
 | D16 | A11y | P2 | Font scaling unverified |
 | D17 | UX | P1 | Aspect ratio locked to 1:1 |
+| D18 | Visual | P3 | ✅ Materialize anim: faster scan lines + bolt pulses to yellow *(PR 5)* |
+| D19 | Visual | P3 | ✅ Canvas → HUD spacing tightness *(PR 5: 12 → 20dp)* |
+| D20 | UX | P2 | ✅ Prompt input `minLines = 3` *(PR 5)* |
+| D21 | Visual | P3 | ✅ Spacing scale unification *(PR 5)* |
 | E1 | Product | P1 | No image source picker |
 | E2 | Product | P1 | Only 2 text boxes |
 | E3 | Product | P1 | Square-only canvas |
@@ -575,12 +602,13 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 2 — Token + safety strategy:** A1 *(interim)*. A2 and E10 marked Not Applicable for this personal-only build. ⚠️ **landed 2026-05-29 — A1 is interim only.** The proxy was not stood up (requires hosting/billing decision); a `REPLICATE_BASE_URL` seam was added so the proxy is a one-line swap when ready.
 - **PR 3 — Prompt quality (out-of-band):** B7 + expanded artifact negatives (hand/finger/limb/duplication terms), per-model positive suffix + negative prompt, Flux gets no negative. ✅ **landed 2026-05-29.** Inserted ahead of the original roadmap on user request after seeing artifacts in generated images. Subsequent PRs renumbered (+1) below.
 - **PR 4 — Split MemeScreen:** B1. ✅ **landed 2026-05-29.** 8 files in `ui/`, flat package, behavior preserved.
-- **PR 5 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect). *(was PR 4)*
-- **PR 6 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). *(was PR 5)*
-- **PR 7 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 6)*
-- **PR 8 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios). *(was PR 7)*
-- **PR 9 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling). *(was PR 8)*
-- **PR 10 — Repo + UI tests:** F1, F2, F3, F4. *(was PR 9)*
-- **PR 11 — Brand + legal:** A6, E13, E11. *(was PR 10)*
+- **PR 5 — UX polish (out-of-band):** D18, D19, D20, D21. ✅ **landed 2026-05-29.** From running the app: materialize animation pacing + color, canvas/HUD spacing, multi-line prompt default, spacing scale unification. Inserted ahead of the original roadmap on user request.
+- **PR 6 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect). *(was PR 5 pre-PR-5-out-of-band)*
+- **PR 7 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). *(was PR 6)*
+- **PR 8 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 7)*
+- **PR 9 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios). *(was PR 8)*
+- **PR 10 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling). *(was PR 9)*
+- **PR 11 — Repo + UI tests:** F1, F2, F3, F4. *(was PR 10)*
+- **PR 12 — Brand + legal:** A6, E13, E11. *(was PR 11)*
 
 Happy to drive any one of these. Tell me which group to start with.
