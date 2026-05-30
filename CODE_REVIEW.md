@@ -15,6 +15,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **PR 1** | A3, A4, A5, C4 | 2026-05-29 | All four landed as recommended, **plus one unplanned addition**: `lint { disable += "Instantiatable" }` in `app/build.gradle.kts` to work around an AGP-alpha lint false positive on `ComponentActivity`. Should be removed once G1 (move off alpha AGP) lands. Release build (`assembleRelease`) and unit tests verified green. A4 implementation: chose the simpler `allowBackup="false"` route over populating the rule files; the `fullBackupContent`/`dataExtractionRules` manifest attrs were left in place but are inert. |
 | **PR 2** | A1 *(interim)* | 2026-05-29 | **A2 and E10 were attempted and reverted same-day** on user feedback. Both were Play-Store generative-AI-policy items that do not apply to a personal-only build that the original brief explicitly said should have "no content moderation". A1 deviated from the "stand up a proxy" recommendation — proxy involves a hosting / billing decision out of scope for code work. Instead landed the **documented personal-build branch** the review offered as the alternative: new `README.md` with an explicit "Distribution status" section, plus a `REPLICATE_BASE_URL` BuildConfig seam (default `https://api.replicate.com/`) so a future proxy can be swapped in with one line in `local.properties`. A1 should be re-opened and a proxy stood up before any distribution. **A2 reverted:** restored `disable_safety_checker = true`. **E10 reverted:** removed the TopAppBar overflow + "Report content" menu item + supporting strings — pointless on a single-user app. Going forward, skip review items framed around Play Store generative-AI policy unless the distribution stance changes. Release build + unit tests green. |
 | **PR 3** | B7 + prompt-quality expansion | 2026-05-29 | User asked whether better prompting could reduce real-world artifacts (extra/fused fingers, twin subjects, malformed limbs). Did B7 from the review plus an expanded artifact-focused negative prompt as one PR. Introduced a private `ModelPromptConfig` (positive suffix + negative prompt) in `ImageRepository.kt`, plus a `MODEL_PROMPT_CONFIGS` map keyed by Replicate model id. Photoreal models (Juggernaut, Stability, RealVis, DreamShaper) get a photoreal style suffix + anti-cartoon/anime negatives + the canonical anatomy/duplication negatives. Stylized models (Blue Pencil anime, Proteus painterly) get model-appropriate suffixes and **no** anti-cartoon/anime negatives. Flux Schnell gets a minimal natural-language suffix and **no** negative at all (rectified-flow architecture doesn't use CFG/negatives). Negative term selection is comment-explained inline. Release + unit tests green. Note: this also bumps the original "PR 3 — Split MemeScreen" item from the roadmap → PR 4. |
+| **PR 4** | B1 | 2026-05-29 | Split the 2,025-line `MemeScreen.kt` into 8 files in `ui/`: `MemeScreen.kt` (324 — root + `MemeContent` state hoisting + topbar + snackbar host), `MemeLayouts.kt` (209 — `CompactLayout`, `ExpandedLayout`, `FieldLabel`), `MemeCanvas.kt` (570 — canvas + idle/loading/error states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (353 — overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (454 — `HudStrip`, `Dock`, `PromptInput`, `EnergizeButton`, `GhostButton`), `ModelPicker.kt` (280 — selector + sheet + card), `ImageModelMetadata.kt` (52 — `shortLabel`/`shortGlyph`/`displayNameRes`/`descriptionRes` extension props on `ImageModel`, now `internal`), `PreviewShell.kt` (53 — shared `PREVIEW_BG`, `PreviewShell`, `PreviewCanvasFrame`). Visibility tightened: composables called cross-file are `internal`, leaf helpers stayed `private`. All previews moved next to their components. Slightly different from the per-component subpackages the original review sketched (kept flat `ui/` for 8 files); the renamed `MemeLayouts.kt` bundles both layouts since they're sibling concerns. Behavior preserved verbatim — caught one subtle drift mid-split (`.clip(CircleShape).background(...)` → `.background(..., CircleShape)` on `ResizeHandle`) and reverted to the original. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
 
@@ -113,7 +114,7 @@ App name "Meme Me Up Scotty", "Stardate" design system, "Energize", "Materializi
 
 # Group B — Architecture & Engineering (P1)
 
-### B1. `MemeScreen.kt` is 2,025 lines [P1]
+### B1. `MemeScreen.kt` is 2,025 lines [P1] ✅ **DONE (PR 4, 2026-05-29)**
 **File:** `app/src/main/java/com/rsilverst/mememeupscotty/ui/MemeScreen.kt`
 
 Holds screen root, compact + expanded layouts, canvas, every state, every overlay, every input, dock, model picker, model metadata extension props, font-fitting algorithm, and 13 previews. This is the largest source of future friction.
@@ -136,6 +137,8 @@ ui/model/ImageModelMetadata.kt   // shortLabel/shortGlyph/displayNameRes/descrip
 ui/text/FontFitting.kt
 ```
 Previews live next to each component.
+
+**Implementation note (PR 4, 2026-05-29):** consolidated to 8 files in a flat `ui/` package instead of the proposed 14-file subpackage layout — the per-state subdivisions (separate files for `EmptyState`, `LoadingState`, `ErrorState`) felt over-fragmented for one screen. Final shape: `MemeScreen.kt` (root + state hoisting + topbar + snackbar host), `MemeLayouts.kt` (`CompactLayout` + `ExpandedLayout` + `FieldLabel`), `MemeCanvas.kt` (canvas + all states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (HUD + Dock + buttons), `ModelPicker.kt` (selector + sheet + card), `ImageModelMetadata.kt` (extension props), `PreviewShell.kt` (shared preview helpers). Largest file is now `MemeCanvas.kt` at 570 lines. Behavior preserved verbatim. See PR 4 row in the Status Log for the file-by-file breakdown.
 
 ### B2. Errors are stringly-typed across the layer boundary [P1]
 **File:** `data/repository/ImageRepository.kt:108-125`, `ui/MemeScreen.kt:935-945`
@@ -499,7 +502,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | A5 | Release | **P0** | ⚠️ R8 / ProGuard disabled *(PR 1, +`Instantiatable` lint disable)* |
 | A6 | Legal | **P0** (distribution) | Star Trek trademark exposure |
 | A7 | Security | — | Token-on-disk audit (informational) |
-| B1 | Architecture | P1 | 2,025-LOC MemeScreen.kt |
+| B1 | Architecture | P1 | ✅ 2,025-LOC MemeScreen.kt *(PR 4, split into 8 files; largest now 570 LOC)* |
 | B2 | Architecture | P1 | Stringly-typed errors across layers |
 | B3 | Architecture | P1 | Brief vs. actual divergence |
 | B4 | Code style | P1 | snake_case Kotlin properties |
@@ -571,7 +574,7 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 1 — Release-block kit:** A3 (logging), A4 (backup), A5 (R8), C4 (printStackTrace). ✅ **landed 2026-05-29**
 - **PR 2 — Token + safety strategy:** A1 *(interim)*. A2 and E10 marked Not Applicable for this personal-only build. ⚠️ **landed 2026-05-29 — A1 is interim only.** The proxy was not stood up (requires hosting/billing decision); a `REPLICATE_BASE_URL` seam was added so the proxy is a one-line swap when ready.
 - **PR 3 — Prompt quality (out-of-band):** B7 + expanded artifact negatives (hand/finger/limb/duplication terms), per-model positive suffix + negative prompt, Flux gets no negative. ✅ **landed 2026-05-29.** Inserted ahead of the original roadmap on user request after seeing artifacts in generated images. Subsequent PRs renumbered (+1) below.
-- **PR 4 — Split MemeScreen:** B1. *(was PR 3 pre-PR-3-out-of-band)*
+- **PR 4 — Split MemeScreen:** B1. ✅ **landed 2026-05-29.** 8 files in `ui/`, flat package, behavior preserved.
 - **PR 5 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect). *(was PR 4)*
 - **PR 6 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). *(was PR 5)*
 - **PR 7 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 6)*
