@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Meme Me Up Scotty</string>
+    <string name="app_name">Meme Me Up, Scotty</string>
 
     <!-- Prompt -->
     <string name="prompt_placeholder">Describe your meme&#8230;</string>
