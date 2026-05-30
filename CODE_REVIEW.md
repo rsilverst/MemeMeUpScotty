@@ -14,6 +14,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 |---|---|---|---|
 | **PR 1** | A3, A4, A5, C4 | 2026-05-29 | All four landed as recommended, **plus one unplanned addition**: `lint { disable += "Instantiatable" }` in `app/build.gradle.kts` to work around an AGP-alpha lint false positive on `ComponentActivity`. Should be removed once G1 (move off alpha AGP) lands. Release build (`assembleRelease`) and unit tests verified green. A4 implementation: chose the simpler `allowBackup="false"` route over populating the rule files; the `fullBackupContent`/`dataExtractionRules` manifest attrs were left in place but are inert. |
 | **PR 2** | A1 *(interim)* | 2026-05-29 | **A2 and E10 were attempted and reverted same-day** on user feedback. Both were Play-Store generative-AI-policy items that do not apply to a personal-only build that the original brief explicitly said should have "no content moderation". A1 deviated from the "stand up a proxy" recommendation — proxy involves a hosting / billing decision out of scope for code work. Instead landed the **documented personal-build branch** the review offered as the alternative: new `README.md` with an explicit "Distribution status" section, plus a `REPLICATE_BASE_URL` BuildConfig seam (default `https://api.replicate.com/`) so a future proxy can be swapped in with one line in `local.properties`. A1 should be re-opened and a proxy stood up before any distribution. **A2 reverted:** restored `disable_safety_checker = true`. **E10 reverted:** removed the TopAppBar overflow + "Report content" menu item + supporting strings — pointless on a single-user app. Going forward, skip review items framed around Play Store generative-AI policy unless the distribution stance changes. Release build + unit tests green. |
+| **PR 3** | B7 + prompt-quality expansion | 2026-05-29 | User asked whether better prompting could reduce real-world artifacts (extra/fused fingers, twin subjects, malformed limbs). Did B7 from the review plus an expanded artifact-focused negative prompt as one PR. Introduced a private `ModelPromptConfig` (positive suffix + negative prompt) in `ImageRepository.kt`, plus a `MODEL_PROMPT_CONFIGS` map keyed by Replicate model id. Photoreal models (Juggernaut, Stability, RealVis, DreamShaper) get a photoreal style suffix + anti-cartoon/anime negatives + the canonical anatomy/duplication negatives. Stylized models (Blue Pencil anime, Proteus painterly) get model-appropriate suffixes and **no** anti-cartoon/anime negatives. Flux Schnell gets a minimal natural-language suffix and **no** negative at all (rectified-flow architecture doesn't use CFG/negatives). Negative term selection is comment-explained inline. Release + unit tests green. Note: this also bumps the original "PR 3 — Split MemeScreen" item from the roadmap → PR 4. |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
 
@@ -183,7 +184,7 @@ Boilerplate. Modern pattern uses the `viewModel { initializer { … } }` API or 
 
 **Action:** Replace with a `viewModelFactory { initializer { MainViewModel(repo) } }` declared in MainActivity, drop the factory class entirely.
 
-### B7. Hardcoded "photorealistic" style suffix conflicts with stylized models [P1 — bug]
+### B7. Hardcoded "photorealistic" style suffix conflicts with stylized models [P1 — bug] ✅ **DONE (PR 3, 2026-05-29)**
 **File:** `data/repository/ImageRepository.kt:146-147`
 
 ```kotlin
@@ -192,6 +193,8 @@ Boilerplate. Modern pattern uses the `viewModel { initializer { … } }` API or 
 Appended to every prompt regardless of model. Users who select **Blue Pencil XL (anime)** or **Proteus (painterly)** get a photorealistic suffix that fights the model's strengths.
 
 **Action:** Pull the style suffix into `ImageModel` metadata so each model contributes its own modifiers (or none).
+
+**Implementation note (PR 3, 2026-05-29):** went a slightly different route from "put it on `ImageModel`" — the per-model config (`MODEL_PROMPT_CONFIGS` map keyed by Replicate model id, plus a private `ModelPromptConfig` data class) lives in `ImageRepository.kt`. Reasoning: `ImageModel` is in the `ui.viewmodel` package, and putting prompt-shaping data on a UI-layer enum would couple the data layer to UI. Keeping the configs string-keyed in the repository preserves layer separation; if `ImageModel.id` values change, the map keys need to follow. Also landed expanded anatomy/duplication negatives for the same artifacts users were actually seeing (extra/fused fingers, twins, mangled limbs) — that scope was outside B7 strictly but was the motivating reason to revisit this file. See the PR 3 row in the Status Log above for full details.
 
 ### B8. `NetworkModule` is an `object` singleton with no swappable seam [P2]
 **File:** `data/network/NetworkModule.kt`
@@ -502,7 +505,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | B4 | Code style | P1 | snake_case Kotlin properties |
 | B5 | Code style | P2 | Mixed JSON parsers |
 | B6 | Code style | P2 | Hand-rolled ViewModelFactory |
-| B7 | Correctness | P1 | Photorealistic suffix on stylized models |
+| B7 | Correctness | P1 | ✅ Photorealistic suffix on stylized models *(PR 3, also expanded artifact negatives)* |
 | B8 | Architecture | P2 | NetworkModule has no swappable seam |
 | B9 | Cleanup | P3 | Dead `ImageModel.label` field |
 | C1 | Correctness | P1 | GraphicsLayer capture is racy |
@@ -567,13 +570,14 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 
 - **PR 1 — Release-block kit:** A3 (logging), A4 (backup), A5 (R8), C4 (printStackTrace). ✅ **landed 2026-05-29**
 - **PR 2 — Token + safety strategy:** A1 *(interim)*. A2 and E10 marked Not Applicable for this personal-only build. ⚠️ **landed 2026-05-29 — A1 is interim only.** The proxy was not stood up (requires hosting/billing decision); a `REPLICATE_BASE_URL` seam was added so the proxy is a one-line swap when ready.
-- **PR 3 — Split MemeScreen:** B1.
-- **PR 4 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect).
-- **PR 5 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo).
-- **PR 6 — Inputs, drag bounds, insets:** C5, C6, C8.
-- **PR 7 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios).
-- **PR 8 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling).
-- **PR 9 — Repo + UI tests:** F1, F2, F3, F4.
-- **PR 10 — Brand + legal:** A6, E13, E11.
+- **PR 3 — Prompt quality (out-of-band):** B7 + expanded artifact negatives (hand/finger/limb/duplication terms), per-model positive suffix + negative prompt, Flux gets no negative. ✅ **landed 2026-05-29.** Inserted ahead of the original roadmap on user request after seeing artifacts in generated images. Subsequent PRs renumbered (+1) below.
+- **PR 4 — Split MemeScreen:** B1. *(was PR 3 pre-PR-3-out-of-band)*
+- **PR 5 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect). *(was PR 4)*
+- **PR 6 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). *(was PR 5)*
+- **PR 7 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 6)*
+- **PR 8 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios). *(was PR 7)*
+- **PR 9 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling). *(was PR 8)*
+- **PR 10 — Repo + UI tests:** F1, F2, F3, F4. *(was PR 9)*
+- **PR 11 — Brand + legal:** A6, E13, E11. *(was PR 10)*
 
 Happy to drive any one of these. Tell me which group to start with.
