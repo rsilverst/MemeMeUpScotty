@@ -18,4 +18,8 @@ local.properties
 .idea/
 build/
 .gradle/
-.claude/settings.local.json
+.claude/
+
+# Signing material
+*.jks
+*.keystore

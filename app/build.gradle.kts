@@ -19,6 +19,21 @@ val replicateBaseUrl = localProperties.getProperty("REPLICATE_BASE_URL")
     ?: System.getenv("REPLICATE_BASE_URL")
     ?: "https://api.replicate.com/"
 
+// Release signing — credentials live in local.properties (gitignored). The
+// release signingConfig is wired below in android { signingConfigs { ... } }
+// only when all four properties are present; otherwise release builds remain
+// unsigned (useful for CI / fresh checkouts that have no keystore yet).
+val releaseKeystoreFile = localProperties.getProperty("RELEASE_KEYSTORE_FILE")
+val releaseKeystorePassword = localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseKeystoreFile,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 if (replicateToken.isBlank() || replicateToken == "YOUR_ACCESS_TOKEN") {
     logger.warn("""
 
@@ -60,6 +75,17 @@ android {
         buildConfigField("String", "REPLICATE_BASE_URL", "\"$replicateBaseUrl\"")
     }
 
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file(releaseKeystoreFile!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -68,6 +94,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
