@@ -1,5 +1,7 @@
 package com.rsilverst.mememeupscotty
 
+import com.rsilverst.mememeupscotty.data.repository.GenerationError
+import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
@@ -15,7 +17,7 @@ import org.junit.Test
 import java.io.File
 
 class MockImageRepository : ImageRepository {
-    var resultToReturn: Result<File>? = null
+    var outcomeToReturn: GenerationOutcome? = null
     var lastModelId: String? = null
     var lastPrompt: String? = null
     var lastCacheDir: File? = null
@@ -28,12 +30,13 @@ class MockImageRepository : ImageRepository {
         modelId: String,
         prompt: String,
         cacheDir: File
-    ): Result<File> {
+    ): GenerationOutcome {
         lastModelId = modelId
         lastPrompt = prompt
         lastCacheDir = cacheDir
         gate.await()
-        return resultToReturn ?: Result.failure(Exception("Not configured"))
+        return outcomeToReturn
+            ?: GenerationOutcome.Failure(GenerationError.Unexpected("Not configured"))
     }
 }
 
@@ -58,7 +61,7 @@ class MainViewModelTest {
         val viewModel = MainViewModel(mockRepository)
         val cacheDir = File("dummy_cache")
         val successFile = File("success_image.jpg")
-        mockRepository.resultToReturn = Result.success(successFile)
+        mockRepository.outcomeToReturn = GenerationOutcome.Success(successFile)
 
         assertEquals(GenerationState.Idle, viewModel.generationState.value)
 
@@ -83,8 +86,8 @@ class MainViewModelTest {
         val mockRepository = MockImageRepository()
         val viewModel = MainViewModel(mockRepository)
         val cacheDir = File("dummy_cache")
-        val errorMessage = "Failed to generate image"
-        mockRepository.resultToReturn = Result.failure(Exception(errorMessage))
+        val failureError = GenerationError.Unexpected("Failed to generate image")
+        mockRepository.outcomeToReturn = GenerationOutcome.Failure(failureError)
 
         assertEquals(GenerationState.Idle, viewModel.generationState.value)
 
@@ -98,6 +101,23 @@ class MainViewModelTest {
 
         assertTrue(viewModel.generationState.value is GenerationState.Error)
         val errorState = viewModel.generationState.value as GenerationState.Error
-        assertEquals(errorMessage, errorState.message)
+        assertEquals(failureError, errorState.error)
+    }
+
+    @Test
+    fun generateImage_typedAuthError_propagatesAsIs() = runTest(testDispatcher) {
+        // Smoke test that non-Unexpected typed variants survive the repo →
+        // VM → state flow without being flattened to a string.
+        val mockRepository = MockImageRepository()
+        val viewModel = MainViewModel(mockRepository)
+        mockRepository.outcomeToReturn =
+            GenerationOutcome.Failure(GenerationError.AuthRejected)
+
+        viewModel.generateImage("prompt", File("dummy_cache"))
+        mockRepository.gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val errorState = viewModel.generationState.value as GenerationState.Error
+        assertEquals(GenerationError.AuthRejected, errorState.error)
     }
 }

@@ -1,6 +1,7 @@
 package com.rsilverst.mememeupscotty.data.network
 
 import com.rsilverst.mememeupscotty.BuildConfig
+import com.squareup.moshi.Moshi
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -12,6 +13,10 @@ object NetworkModule {
     // be swapped in via local.properties without touching code. Defaults to
     // api.replicate.com.
     private val BASE_URL = BuildConfig.REPLICATE_BASE_URL
+
+    // Shared Moshi instance — handed to Retrofit's converter factory and also
+    // reused by the repository for parsing Replicate's JSON error bodies.
+    internal val moshi: Moshi = Moshi.Builder().build()
 
     // Body-level logging includes request/response bodies and is too noisy
     // (and a small perf hit) for release. Authorization headers are also
@@ -45,7 +50,7 @@ object NetworkModule {
     val retrofit: Retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create())
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
     val replicateApi: ReplicateApi = retrofit.create(ReplicateApi::class.java)

@@ -43,6 +43,14 @@ data class ReplicatePrediction(
     val error: String? = null
 )
 
+// Replicate returns failure bodies like {"detail": "...", "retry_after": 30}.
+// retry_after is only present on 429 responses.
+@JsonClass(generateAdapter = true)
+data class ReplicateErrorBody(
+    val detail: String? = null,
+    val retry_after: Int? = null
+)
+
 interface ReplicateApi {
     @GET("v1/models/{owner}/{name}")
     suspend fun getModel(

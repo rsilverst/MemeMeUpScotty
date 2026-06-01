@@ -2,6 +2,7 @@ package com.rsilverst.mememeupscotty.data.repository
 
 import com.rsilverst.mememeupscotty.data.network.NetworkModule
 import com.rsilverst.mememeupscotty.data.network.ReplicateApi
+import com.rsilverst.mememeupscotty.data.network.ReplicateErrorBody
 import com.rsilverst.mememeupscotty.data.network.ReplicatePrediction
 import com.rsilverst.mememeupscotty.data.network.ReplicatePredictionInput
 import com.rsilverst.mememeupscotty.data.network.ReplicatePredictionRequest
@@ -9,13 +10,36 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Request
-import org.json.JSONObject
 import retrofit2.Response
 import java.io.File
 import kotlin.random.Random
 
+// Result of a generation attempt. UI layers should pattern-match on this
+// (and on GenerationError below) rather than reading any human-readable
+// strings — string copy lives entirely in the resource layer now.
+sealed class GenerationOutcome {
+    data class Success(val file: File) : GenerationOutcome()
+    data class Failure(val error: GenerationError) : GenerationOutcome()
+}
+
+// Typed taxonomy of generation failures. Each variant is what the UI
+// switches on to pick a title + detail string and decide whether retry
+// is reasonable. Add a new variant rather than overloading Unexpected
+// when a new condition is worth distinguishing in the UI.
+sealed class GenerationError {
+    data object AuthRejected : GenerationError()
+    data object OutOfCredit : GenerationError()
+    data object ModelUnavailable : GenerationError()
+    data class RateLimited(val retryAfterSec: Int?) : GenerationError()
+    data class Server(val httpCode: Int) : GenerationError()
+    data object Timeout : GenerationError()
+    // Catch-all. `detail` is raw (English from Replicate or our own
+    // fallback); the UI shows it verbatim in the small body text.
+    data class Unexpected(val detail: String) : GenerationError()
+}
+
 interface ImageRepository {
-    suspend fun generateImage(modelId: String, prompt: String, cacheDir: File): Result<File>
+    suspend fun generateImage(modelId: String, prompt: String, cacheDir: File): GenerationOutcome
 }
 
 private data class ModelPromptConfig(
@@ -25,17 +49,19 @@ private data class ModelPromptConfig(
 
 class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository {
 
-    override suspend fun generateImage(modelId: String, prompt: String, cacheDir: File): Result<File> = withContext(Dispatchers.IO) {
+    private val errorBodyAdapter = NetworkModule.moshi.adapter(ReplicateErrorBody::class.java)
+
+    override suspend fun generateImage(modelId: String, prompt: String, cacheDir: File): GenerationOutcome = withContext(Dispatchers.IO) {
         var tempFile: File? = null
         try {
             val (owner, name) = parseModelId(modelId)
-                ?: return@withContext Result.failure(Exception("Invalid REPLICATE_MODEL_ID: '$modelId' (expected 'owner/name')"))
+                ?: return@withContext failure(GenerationError.Unexpected("Invalid model id: '$modelId' (expected 'owner/name')"))
 
             val modelResponse = api.getModel(owner, name)
             val model = unwrap(modelResponse)
-                ?: return@withContext Result.failure(errorFor(modelResponse, "fetch model $owner/$name"))
+                ?: return@withContext failure(errorFor(modelResponse))
             val versionId = model.latest_version?.id
-                ?: return@withContext Result.failure(Exception("Model $owner/$name has no published version"))
+                ?: return@withContext failure(GenerationError.Unexpected("Model $owner/$name has no published version"))
 
             val config = MODEL_PROMPT_CONFIGS[modelId] ?: DEFAULT_PROMPT_CONFIG
             val request = ReplicatePredictionRequest(
@@ -52,28 +78,28 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
 
             val createResponse = api.createPrediction(request)
             val created = unwrap(createResponse)
-                ?: return@withContext Result.failure(errorFor(createResponse, "create prediction"))
+                ?: return@withContext failure(errorFor(createResponse))
 
             val finished = poll(created.id)
-                ?: return@withContext Result.failure(Exception("Prediction timed out"))
+                ?: return@withContext failure(GenerationError.Timeout)
 
             when (finished.status) {
                 "succeeded" -> {
                     val url = finished.output?.firstOrNull()
-                        ?: return@withContext Result.failure(Exception("Prediction succeeded but returned no image"))
+                        ?: return@withContext failure(GenerationError.Unexpected("Prediction succeeded but returned no image"))
                     val file = File.createTempFile("generated_meme_", ".png", cacheDir)
                     tempFile = file
                     downloadTo(url, file)
-                    Result.success(file)
+                    GenerationOutcome.Success(file)
                 }
                 "failed", "canceled" -> {
-                    Result.failure(Exception(finished.error ?: "Prediction ${finished.status}"))
+                    failure(GenerationError.Unexpected(finished.error ?: "Prediction ${finished.status}"))
                 }
-                else -> Result.failure(Exception("Unexpected status: ${finished.status}"))
+                else -> failure(GenerationError.Unexpected("Unexpected status: ${finished.status}"))
             }
         } catch (e: Exception) {
             tempFile?.takeIf { it.exists() }?.delete()
-            Result.failure(e)
+            failure(GenerationError.Unexpected(e.message ?: "Unknown error"))
         }
     }
 
@@ -106,39 +132,25 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
     private fun <T> unwrap(response: Response<T>): T? =
         if (response.isSuccessful) response.body() else null
 
-    private fun errorFor(response: Response<*>, op: String): Exception {
+    // Maps an HTTP failure response to a typed GenerationError. Replicate's
+    // error bodies are JSON like {"detail": "...", "retry_after": 30}; we
+    // parse them with Moshi and only fall back to a raw body for codes we
+    // don't have a typed variant for.
+    private fun errorFor(response: Response<*>): GenerationError {
         val body = response.errorBody()?.string().orEmpty()
-        return Exception(friendlyMessage(response.code(), body, op))
-    }
-
-    private fun friendlyMessage(code: Int, body: String, op: String): String {
-        val detail = parseJsonField(body, "detail")
-        val retryAfter = parseJsonInt(body, "retry_after")
-        return when (code) {
-            401 -> "Your Replicate API token isn't accepted. Check REPLICATE_API_TOKEN in local.properties."
-            402 -> "You're out of Replicate credit. Add some at replicate.com/account/billing."
-            404 -> "This model isn't available on Replicate right now. Try a different one from the dropdown."
-            429 -> buildString {
-                append("Hit Replicate's rate limit.")
-                if (retryAfter != null) {
-                    append(" Try again in ${retryAfter}s.")
-                } else {
-                    append(" Try again in a few seconds.")
-                }
-            }
-            in 500..599 -> "Replicate is having a problem (HTTP $code). Try again in a moment."
-            else -> detail?.let { "Replicate: $it" } ?: "Replicate $op failed (HTTP $code)."
+        val parsed = parseErrorBody(body)
+        return when (val code = response.code()) {
+            401 -> GenerationError.AuthRejected
+            402 -> GenerationError.OutOfCredit
+            404 -> GenerationError.ModelUnavailable
+            429 -> GenerationError.RateLimited(parsed?.retry_after)
+            in 500..599 -> GenerationError.Server(code)
+            else -> GenerationError.Unexpected(parsed?.detail ?: "Replicate request failed (HTTP $code)")
         }
     }
 
-    private fun parseJsonField(body: String, field: String): String? = try {
-        if (body.isBlank()) null else JSONObject(body).optString(field).takeIf { it.isNotBlank() }
-    } catch (_: Exception) {
-        null
-    }
-
-    private fun parseJsonInt(body: String, field: String): Int? = try {
-        if (body.isBlank()) null else JSONObject(body).optInt(field, -1).takeIf { it > 0 }
+    private fun parseErrorBody(body: String): ReplicateErrorBody? = try {
+        if (body.isBlank()) null else errorBodyAdapter.fromJson(body)
     } catch (_: Exception) {
         null
     }
@@ -152,6 +164,9 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
     private fun composePrompt(userPrompt: String, config: ModelPromptConfig): String =
         if (config.positiveSuffix.isBlank()) userPrompt
         else "$userPrompt, ${config.positiveSuffix}"
+
+    private fun failure(error: GenerationError): GenerationOutcome.Failure =
+        GenerationOutcome.Failure(error)
 
     companion object {
         // Anti-anatomy + anti-duplication terms. These are the canonical SDXL-era

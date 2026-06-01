@@ -3,6 +3,8 @@ package com.rsilverst.mememeupscotty.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.rsilverst.mememeupscotty.data.repository.GenerationError
+import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +26,7 @@ sealed class GenerationState {
     data object Idle : GenerationState()
     data object Loading : GenerationState()
     data class Success(val imageFile: File) : GenerationState()
-    data class Error(val message: String) : GenerationState()
+    data class Error(val error: GenerationError) : GenerationState()
 }
 
 class MainViewModel(
@@ -46,21 +48,22 @@ class MainViewModel(
     fun generateImage(prompt: String, cacheDir: File) {
         viewModelScope.launch {
             _generationState.value = GenerationState.Loading
-            val result = imageRepository.generateImage(_selectedModel.value.id, prompt, cacheDir)
-            result.onSuccess { file ->
-                lastGeneratedFile?.let { previousFile ->
-                    try {
-                        if (previousFile.exists()) {
-                            previousFile.delete()
+            val outcome = imageRepository.generateImage(_selectedModel.value.id, prompt, cacheDir)
+            _generationState.value = when (outcome) {
+                is GenerationOutcome.Success -> {
+                    lastGeneratedFile?.let { previousFile ->
+                        try {
+                            if (previousFile.exists()) {
+                                previousFile.delete()
+                            }
+                        } catch (_: Exception) {
+                            // Suppress deletion errors
                         }
-                    } catch (_: Exception) {
-                        // Suppress deletion errors
                     }
+                    lastGeneratedFile = outcome.file
+                    GenerationState.Success(outcome.file)
                 }
-                lastGeneratedFile = file
-                _generationState.value = GenerationState.Success(file)
-            }.onFailure { error ->
-                _generationState.value = GenerationState.Error(error.message ?: "Unknown error")
+                is GenerationOutcome.Failure -> GenerationState.Error(outcome.error)
             }
         }
     }

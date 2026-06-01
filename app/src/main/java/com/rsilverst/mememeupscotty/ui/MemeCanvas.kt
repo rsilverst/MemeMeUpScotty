@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.rsilverst.mememeupscotty.R
+import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
@@ -127,7 +128,7 @@ internal fun MemeCanvas(
                 )
             }
             is GenerationState.Error   -> ErrorState(
-                message = generationState.message,
+                error = generationState.error,
                 onRetry = onRetry
             )
         }
@@ -401,8 +402,9 @@ private fun LoadingState() {
 }
 
 @Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
-    val themedTitle = themedErrorTitle(message)
+private fun ErrorState(error: GenerationError, onRetry: () -> Unit) {
+    val title = stringResource(error.titleRes())
+    val detail = error.detailText()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -427,14 +429,14 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            text = themedTitle,
+            text = title,
             style = MaterialTheme.typography.titleLarge,
             color = TextHigh,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = message,
+            text = detail,
             style = MaterialTheme.typography.bodyMedium,
             color = TextMid,
             textAlign = TextAlign.Center
@@ -465,20 +467,34 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
     }
 }
 
-// Pick a Stardate-flavoured error headline based on keywords in the
-// repository's friendly message. Fragile across copy edits (see B2 in
-// CODE_REVIEW.md — typed errors would replace this) but adequate today.
+// GenerationError → headline resource. Pure when-mapping; no string
+// keyword matching. Adding a variant requires updating this and
+// detailText() below — the compiler will flag the missing case.
+private fun GenerationError.titleRes(): Int = when (this) {
+    GenerationError.AuthRejected      -> R.string.error_title_auth
+    GenerationError.OutOfCredit       -> R.string.error_title_quota
+    GenerationError.ModelUnavailable  -> R.string.error_title_not_found
+    is GenerationError.RateLimited    -> R.string.error_title_rate_limit
+    is GenerationError.Server         -> R.string.error_title_server
+    GenerationError.Timeout           -> R.string.error_title_timeout
+    is GenerationError.Unexpected     -> R.string.error_title_generic
+}
+
+// GenerationError → detail body text. Wraps Compose's stringResource so
+// it can be called from the @Composable ErrorState; for variants with
+// parameters (RateLimited's retry seconds, Server's HTTP code) we use
+// the templated resource.
 @Composable
-private fun themedErrorTitle(message: String): String {
-    val lower = message.lowercase()
-    return when {
-        "token" in lower || "401" in lower         -> stringResource(R.string.error_title_auth)
-        "credit" in lower || "billing" in lower    -> stringResource(R.string.error_title_quota)
-        "isn't available" in lower || "404" in lower -> stringResource(R.string.error_title_not_found)
-        "rate limit" in lower || "429" in lower    -> stringResource(R.string.error_title_rate_limit)
-        "having a problem" in lower || "http 5" in lower -> stringResource(R.string.error_title_server)
-        else -> stringResource(R.string.error_title_generic)
-    }
+private fun GenerationError.detailText(): String = when (this) {
+    GenerationError.AuthRejected     -> stringResource(R.string.error_detail_auth)
+    GenerationError.OutOfCredit      -> stringResource(R.string.error_detail_quota)
+    GenerationError.ModelUnavailable -> stringResource(R.string.error_detail_not_found)
+    is GenerationError.RateLimited   -> retryAfterSec?.let {
+        stringResource(R.string.error_detail_rate_limit_retry, it)
+    } ?: stringResource(R.string.error_detail_rate_limit_no_retry)
+    is GenerationError.Server        -> stringResource(R.string.error_detail_server, httpCode)
+    GenerationError.Timeout          -> stringResource(R.string.error_detail_timeout)
+    is GenerationError.Unexpected    -> detail
 }
 
 // ============================================================================
@@ -511,7 +527,7 @@ private fun CanvasErrorStatePreview_Quota() {
     PreviewShell {
         PreviewCanvasFrame {
             ErrorState(
-                message = "You're out of Replicate credit. Add some at replicate.com/account/billing.",
+                error = GenerationError.OutOfCredit,
                 onRetry = {}
             )
         }
@@ -524,7 +540,33 @@ private fun CanvasErrorStatePreview_Auth() {
     PreviewShell {
         PreviewCanvasFrame {
             ErrorState(
-                message = "Your Replicate API token isn't accepted. Check REPLICATE_API_TOKEN in local.properties.",
+                error = GenerationError.AuthRejected,
+                onRetry = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasErrorStatePreview_RateLimited() {
+    PreviewShell {
+        PreviewCanvasFrame {
+            ErrorState(
+                error = GenerationError.RateLimited(retryAfterSec = 30),
+                onRetry = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
+@Composable
+private fun CanvasErrorStatePreview_Timeout() {
+    PreviewShell {
+        PreviewCanvasFrame {
+            ErrorState(
+                error = GenerationError.Timeout,
                 onRetry = {}
             )
         }

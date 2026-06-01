@@ -37,7 +37,18 @@
     <string name="error_title_not_found">That engine isn\'t available.</string>
     <string name="error_title_rate_limit">Engineering\'s overloaded.</string>
     <string name="error_title_server">Replicate\'s having a problem.</string>
+    <string name="error_title_timeout">That took too long.</string>
     <string name="error_try_again">Try again</string>
+
+    <!-- Error detail bodies. Paired 1:1 with GenerationError variants in the
+         repository; UI picks the right one at render time. -->
+    <string name="error_detail_auth">Your Replicate API token isn\'t accepted. Check REPLICATE_API_TOKEN in local.properties.</string>
+    <string name="error_detail_quota">You\'re out of Replicate credit. Add some at replicate.com/account/billing.</string>
+    <string name="error_detail_not_found">This model isn\'t available on Replicate right now. Try a different one from the dropdown.</string>
+    <string name="error_detail_rate_limit_retry">Hit Replicate\'s rate limit. Try again in %1$ds.</string>
+    <string name="error_detail_rate_limit_no_retry">Hit Replicate\'s rate limit. Try again in a few seconds.</string>
+    <string name="error_detail_server">Replicate is having a problem (HTTP %1$d). Try again in a moment.</string>
+    <string name="error_detail_timeout">Prediction took longer than 2 minutes. Try again, or pick a faster model.</string>
 
     <!-- Captions -->
     <string name="default_top_text">TOP TEXT</string>
@@ -78,4 +89,9 @@
 
     <!-- HUD -->
     <string name="hud_reroll">Re-roll seed (regenerate)</string>
+    <string name="hud_tap_to_change">tap to change</string>
+
+    <!-- Expanded layout field labels -->
+    <string name="field_label_prompt">PROMPT</string>
+    <string name="field_label_engine">ENGINE</string>
 </resources>

@@ -152,7 +152,7 @@ internal fun ExpandedLayout(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            FieldLabel(text = "PROMPT")
+            FieldLabel(text = stringResource(R.string.field_label_prompt))
             PromptInput(
                 value = prompt,
                 onValueChange = onPromptChange,
@@ -160,7 +160,7 @@ internal fun ExpandedLayout(
                 minLines = 3
             )
 
-            FieldLabel(text = "ENGINE")
+            FieldLabel(text = stringResource(R.string.field_label_engine))
             ModelSelectorButton(
                 model = selectedModel,
                 onClick = onOpenModelPicker

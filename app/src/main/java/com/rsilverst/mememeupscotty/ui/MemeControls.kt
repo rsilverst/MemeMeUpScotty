@@ -114,7 +114,7 @@ internal fun HudStrip(
                 style = MaterialTheme.typography.labelLarge
             )
             Text(
-                text = "tap to change",
+                text = stringResource(R.string.hud_tap_to_change),
                 style = MaterialTheme.typography.labelMedium,
                 color = TextLow
             )

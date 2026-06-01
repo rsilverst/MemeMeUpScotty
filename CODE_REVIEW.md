@@ -15,6 +15,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **PR 1** | A3, A4, A5, C4 | 2026-05-29 | All four landed as recommended, **plus one unplanned addition**: `lint { disable += "Instantiatable" }` in `app/build.gradle.kts` to work around an AGP-alpha lint false positive on `ComponentActivity`. Should be removed once G1 (move off alpha AGP) lands. Release build (`assembleRelease`) and unit tests verified green. A4 implementation: chose the simpler `allowBackup="false"` route over populating the rule files; the `fullBackupContent`/`dataExtractionRules` manifest attrs were left in place but are inert. |
 | **PR 2** | A1 *(interim)* | 2026-05-29 | **A2 and E10 were attempted and reverted same-day** on user feedback. Both were Play-Store generative-AI-policy items that do not apply to a personal-only build that the original brief explicitly said should have "no content moderation". A1 deviated from the "stand up a proxy" recommendation — proxy involves a hosting / billing decision out of scope for code work. Instead landed the **documented personal-build branch** the review offered as the alternative: new `README.md` with an explicit "Distribution status" section, plus a `REPLICATE_BASE_URL` BuildConfig seam (default `https://api.replicate.com/`) so a future proxy can be swapped in with one line in `local.properties`. A1 should be re-opened and a proxy stood up before any distribution. **A2 reverted:** restored `disable_safety_checker = true`. **E10 reverted:** removed the TopAppBar overflow + "Report content" menu item + supporting strings — pointless on a single-user app. Going forward, skip review items framed around Play Store generative-AI policy unless the distribution stance changes. Release build + unit tests green. |
 | **PR 3** | B7 + prompt-quality expansion | 2026-05-29 | User asked whether better prompting could reduce real-world artifacts (extra/fused fingers, twin subjects, malformed limbs). Did B7 from the review plus an expanded artifact-focused negative prompt as one PR. Introduced a private `ModelPromptConfig` (positive suffix + negative prompt) in `ImageRepository.kt`, plus a `MODEL_PROMPT_CONFIGS` map keyed by Replicate model id. Photoreal models (Juggernaut, Stability, RealVis, DreamShaper) get a photoreal style suffix + anti-cartoon/anime negatives + the canonical anatomy/duplication negatives. Stylized models (Blue Pencil anime, Proteus painterly) get model-appropriate suffixes and **no** anti-cartoon/anime negatives. Flux Schnell gets a minimal natural-language suffix and **no** negative at all (rectified-flow architecture doesn't use CFG/negatives). Negative term selection is comment-explained inline. Release + unit tests green. Note: this also bumps the original "PR 3 — Split MemeScreen" item from the roadmap → PR 4. |
+| **PR 6** | B2, B5, C7 | 2026-05-30 | Typed errors across the layer boundary. Introduced `GenerationOutcome` (`Success(file)` / `Failure(error)`) and `GenerationError` (`AuthRejected`, `OutOfCredit`, `ModelUnavailable`, `RateLimited(retryAfterSec)`, `Server(httpCode)`, `Timeout`, `Unexpected(detail)`) in `data/repository/ImageRepository.kt`. `ImageRepository.generateImage` now returns `GenerationOutcome`; repo's `errorFor` maps HTTP status → typed variant rather than building an English string. `GenerationState.Error` carries `GenerationError` instead of `String`. UI's `ErrorState` consumes the typed error via two pure mapping functions (`titleRes()`, `detailText()`) — the old `themedErrorTitle` keyword matcher is gone. Compile-time exhaustiveness now enforces UI updates when a variant is added. **B5**: `org.json.JSONObject` usage in `parseJsonField`/`parseJsonInt` replaced with a Moshi-codegen `ReplicateErrorBody` DTO; `NetworkModule` now exposes a shared `Moshi` instance that both Retrofit and the repo use. **C7**: hardcoded `"PROMPT"`, `"ENGINE"`, `"tap to change"` moved to `field_label_prompt`, `field_label_engine`, `hud_tap_to_change` in `strings.xml`. Test surface: `MockImageRepository` updated to new interface; added a third test asserting `AuthRejected` survives the repo → VM → state flow as the typed variant (not flattened). New strings: 7 detail resources (rate-limit has retry-with-seconds + no-retry variants) + a new `error_title_timeout` headline. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 | **PR 5** | D18, D19, D20, D21 | 2026-05-29 | UX polish batch from user testing. **D18**: `MemeCanvas.kt::LoadingState` — scan-line tween `2200ms → 1700ms` and replaced the single `pulseAlpha` with a `pulse` (0..1) that drives both `tint = lerp(Plasma500, Solar500, pulse).copy(alpha = 0.8 + 0.2*pulse)`, so the bolt warms to gold at peak per the mockup. **D20**: `PromptInput` gained a `minLines: Int = 1` parameter (guarded so a misconfigured caller with `singleLine = true` cannot crash BasicTextField); `Dock` and `ExpandedLayout` right-column now pass `minLines = 3`. **D19 + D21**: single-pass spacing rework. Canvas → HUD `12dp → 20dp` (both layouts), HUD → Dock `20dp → 24dp`, Dock vertical gap `12dp → 16dp`, expanded right column `18dp → 16dp`, paired Save/Share buttons `10dp → 8dp` (both layouts). `assembleDebug`, `assembleRelease`, `testDebugUnitTest` green. Note: this PR was inserted ahead of the original "PR 5 — Typed errors" item; subsequent PRs renumbered (+1) below. |
 | **PR 4** | B1 | 2026-05-29 | Split the 2,025-line `MemeScreen.kt` into 8 files in `ui/`: `MemeScreen.kt` (324 — root + `MemeContent` state hoisting + topbar + snackbar host), `MemeLayouts.kt` (209 — `CompactLayout`, `ExpandedLayout`, `FieldLabel`), `MemeCanvas.kt` (570 — canvas + idle/loading/error states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (353 — overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (454 — `HudStrip`, `Dock`, `PromptInput`, `EnergizeButton`, `GhostButton`), `ModelPicker.kt` (280 — selector + sheet + card), `ImageModelMetadata.kt` (52 — `shortLabel`/`shortGlyph`/`displayNameRes`/`descriptionRes` extension props on `ImageModel`, now `internal`), `PreviewShell.kt` (53 — shared `PREVIEW_BG`, `PreviewShell`, `PreviewCanvasFrame`). Visibility tightened: composables called cross-file are `internal`, leaf helpers stayed `private`. All previews moved next to their components. Slightly different from the per-component subpackages the original review sketched (kept flat `ui/` for 8 files); the renamed `MemeLayouts.kt` bundles both layouts since they're sibling concerns. Behavior preserved verbatim — caught one subtle drift mid-split (`.clip(CircleShape).background(...)` → `.background(..., CircleShape)` on `ResizeHandle`) and reverted to the original. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 
@@ -141,7 +142,7 @@ Previews live next to each component.
 
 **Implementation note (PR 4, 2026-05-29):** consolidated to 8 files in a flat `ui/` package instead of the proposed 14-file subpackage layout — the per-state subdivisions (separate files for `EmptyState`, `LoadingState`, `ErrorState`) felt over-fragmented for one screen. Final shape: `MemeScreen.kt` (root + state hoisting + topbar + snackbar host), `MemeLayouts.kt` (`CompactLayout` + `ExpandedLayout` + `FieldLabel`), `MemeCanvas.kt` (canvas + all states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (HUD + Dock + buttons), `ModelPicker.kt` (selector + sheet + card), `ImageModelMetadata.kt` (extension props), `PreviewShell.kt` (shared preview helpers). Largest file is now `MemeCanvas.kt` at 570 lines. Behavior preserved verbatim. See PR 4 row in the Status Log for the file-by-file breakdown.
 
-### B2. Errors are stringly-typed across the layer boundary [P1]
+### B2. Errors are stringly-typed across the layer boundary [P1] ✅ **DONE (PR 6, 2026-05-30)**
 **File:** `data/repository/ImageRepository.kt:108-125`, `ui/MemeScreen.kt:935-945`
 
 The repo builds a human-friendly English string, returns it as `Exception.message`. The UI then **string-matches** that English ("token" in lower, "401" in lower, "credit" in lower, …) to pick a themed title. This is fragile: any string tweak in the repo silently breaks the UI grouping, and it cannot be localized.
@@ -174,7 +175,7 @@ The brief in `app/.agent/plan.md` lists **Jetpack Navigation 3** and **Compose M
 @Json(name = "latest_version") val latestVersion: ReplicateModelVersion?
 ```
 
-### B5. Mixed JSON parsers [P2]
+### B5. Mixed JSON parsers [P2] ✅ **DONE (PR 6, 2026-05-30)**
 **File:** `data/repository/ImageRepository.kt:128-138`
 
 `parseJsonField` / `parseJsonInt` use `org.json.JSONObject` to dig into error bodies even though Moshi is wired up.
@@ -270,7 +271,7 @@ Once the user presses Energize they cannot abort until the 120s timeout. Long pr
 
 **Action:** Wire prompt input to submit on Done/Go.
 
-### C7. Hardcoded English strings in code [P2]
+### C7. Hardcoded English strings in code [P2] ✅ **DONE (PR 6, 2026-05-30)**
 **File:** `ui/MemeScreen.kt:494,501,1236`
 
 `"PROMPT"`, `"ENGINE"`, `"tap to change"` are literal in code. Block on i18n.
@@ -526,10 +527,10 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | A6 | Legal | **P0** (distribution) | Star Trek trademark exposure |
 | A7 | Security | — | Token-on-disk audit (informational) |
 | B1 | Architecture | P1 | ✅ 2,025-LOC MemeScreen.kt *(PR 4, split into 8 files; largest now 570 LOC)* |
-| B2 | Architecture | P1 | Stringly-typed errors across layers |
+| B2 | Architecture | P1 | ✅ Stringly-typed errors across layers *(PR 6)* |
 | B3 | Architecture | P1 | Brief vs. actual divergence |
 | B4 | Code style | P1 | snake_case Kotlin properties |
-| B5 | Code style | P2 | Mixed JSON parsers |
+| B5 | Code style | P2 | ✅ Mixed JSON parsers *(PR 6)* |
 | B6 | Code style | P2 | Hand-rolled ViewModelFactory |
 | B7 | Correctness | P1 | ✅ Photorealistic suffix on stylized models *(PR 3, also expanded artifact negatives)* |
 | B8 | Architecture | P2 | NetworkModule has no swappable seam |
@@ -540,7 +541,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | C4 | Logging | P3 | ✅ `printStackTrace` in code *(PR 1)* |
 | C5 | UX | P1 | No nav-bar inset on Dock |
 | C6 | UX | P2 | No IME action on inputs |
-| C7 | i18n | P2 | Hardcoded English in code |
+| C7 | i18n | P2 | ✅ Hardcoded English in code *(PR 6)* |
 | C8 | UX | P1 | No drag-bounds clamping |
 | C9 | UX | P2 | Caption collision unhandled |
 | C10 | Permissions | — | Pre-Q permission path verified |
@@ -603,7 +604,7 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 3 — Prompt quality (out-of-band):** B7 + expanded artifact negatives (hand/finger/limb/duplication terms), per-model positive suffix + negative prompt, Flux gets no negative. ✅ **landed 2026-05-29.** Inserted ahead of the original roadmap on user request after seeing artifacts in generated images. Subsequent PRs renumbered (+1) below.
 - **PR 4 — Split MemeScreen:** B1. ✅ **landed 2026-05-29.** 8 files in `ui/`, flat package, behavior preserved.
 - **PR 5 — UX polish (out-of-band):** D18, D19, D20, D21. ✅ **landed 2026-05-29.** From running the app: materialize animation pacing + color, canvas/HUD spacing, multi-line prompt default, spacing scale unification. Inserted ahead of the original roadmap on user request.
-- **PR 6 — Typed errors:** B2, B5, C7 (i18n hardcoded strings drop out as a side effect). *(was PR 5 pre-PR-5-out-of-band)*
+- **PR 6 — Typed errors:** B2, B5, C7. ✅ **landed 2026-05-30.** Sealed `GenerationOutcome` + `GenerationError`, Moshi error-body DTO, hardcoded English moved to resources.
 - **PR 7 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). *(was PR 6)*
 - **PR 8 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 7)*
 - **PR 9 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios). *(was PR 8)*
