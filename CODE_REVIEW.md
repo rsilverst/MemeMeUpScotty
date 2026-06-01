@@ -19,6 +19,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **PR 5** | D18, D19, D20, D21 | 2026-05-29 | UX polish batch from user testing. **D18**: `MemeCanvas.kt::LoadingState` — scan-line tween `2200ms → 1700ms` and replaced the single `pulseAlpha` with a `pulse` (0..1) that drives both `tint = lerp(Plasma500, Solar500, pulse).copy(alpha = 0.8 + 0.2*pulse)`, so the bolt warms to gold at peak per the mockup. **D20**: `PromptInput` gained a `minLines: Int = 1` parameter (guarded so a misconfigured caller with `singleLine = true` cannot crash BasicTextField); `Dock` and `ExpandedLayout` right-column now pass `minLines = 3`. **D19 + D21**: single-pass spacing rework. Canvas → HUD `12dp → 20dp` (both layouts), HUD → Dock `20dp → 24dp`, Dock vertical gap `12dp → 16dp`, expanded right column `18dp → 16dp`, paired Save/Share buttons `10dp → 8dp` (both layouts). `assembleDebug`, `assembleRelease`, `testDebugUnitTest` green. Note: this PR was inserted ahead of the original "PR 5 — Typed errors" item; subsequent PRs renumbered (+1) below. |
 | **PR 4** | B1 | 2026-05-29 | Split the 2,025-line `MemeScreen.kt` into 8 files in `ui/`: `MemeScreen.kt` (324 — root + `MemeContent` state hoisting + topbar + snackbar host), `MemeLayouts.kt` (209 — `CompactLayout`, `ExpandedLayout`, `FieldLabel`), `MemeCanvas.kt` (570 — canvas + idle/loading/error states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (353 — overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (454 — `HudStrip`, `Dock`, `PromptInput`, `EnergizeButton`, `GhostButton`), `ModelPicker.kt` (280 — selector + sheet + card), `ImageModelMetadata.kt` (52 — `shortLabel`/`shortGlyph`/`displayNameRes`/`descriptionRes` extension props on `ImageModel`, now `internal`), `PreviewShell.kt` (53 — shared `PREVIEW_BG`, `PreviewShell`, `PreviewCanvasFrame`). Visibility tightened: composables called cross-file are `internal`, leaf helpers stayed `private`. All previews moved next to their components. Slightly different from the per-component subpackages the original review sketched (kept flat `ui/` for 8 files); the renamed `MemeLayouts.kt` bundles both layouts since they're sibling concerns. Behavior preserved verbatim — caught one subtle drift mid-split (`.clip(CircleShape).background(...)` → `.background(..., CircleShape)` on `ResizeHandle`) and reverted to the original. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 | **PR 7** | C1, C2, D3, D4 | 2026-06-01 | Capture correctness + undo for caption delete. **C1 + D4**: `captureCleanBitmap()` in `MemeScreen.kt` no longer waits a flat 2 frames before snapshotting — it now `delay(200)`s, which covers the 160ms fadeOut tween on the resize handle / delete chip's `AnimatedVisibility` exit transitions plus a small buffer. The saved bitmap no longer catches mid-fade chrome. Named constant `CAPTURE_CHROME_FADE_BUFFER_MS = 200L` with a comment pointing at the source-of-truth tween duration in `MemeTextOverlay.kt`. **C2**: `MemeCanvas.kt`'s `drawWithContent` block now branches on `capturing`: `if (capturing) { graphicsLayer.record { drawContent() } ; drawLayer(graphicsLayer) } else { drawContent() }`. The canvas no longer pays the layer-record cost on every recomposition during normal use; the layer is populated by the first frame after `capturing` flips true, which the 200ms delay then waits past. **D3**: deleting a caption no longer silently wipes the offset / size. Each `onDelete` lambda in `MemeCanvas` snapshots `(offset, size)` before clearing, then calls the new `onCaptionDeleted: (onUndo: () -> Unit) -> Unit` callback. `MemeContent` provides that callback: shows a `SnackbarDuration.Short` snackbar reading "Text box removed." with an "Undo" action that fires the restore lambda. The caption text itself is preserved by the existing `topText`/`bottomText` state in `MemeContent` (delete only affects visibility + transform), so undo restores everything. New strings: `caption_removed`, `undo`. `onCaptionDeleted` plumbed through `CompactLayout` and `ExpandedLayout`. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
+| **PR 8** | C5, C6, C8 | 2026-06-01 | Inputs, drag bounds, and edge-to-edge insets. **C5**: `Dock`'s outer Column in `MemeControls.kt` now applies `windowInsetsPadding(WindowInsets.navigationBars)` so the Save/Share row doesn't sit under the 3-button nav bar in edge-to-edge mode. Kept on `Dock` itself (only `CompactLayout` calls it; tablet layout unaffected). **C6**: `PromptInput` gained an optional `onSubmit` parameter; the underlying `BasicTextField` now has `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go)` and `keyboardActions = KeyboardActions(onGo = { onSubmit?.invoke() })`. Both call sites — `Dock` in `CompactLayout`, the right-column input in `ExpandedLayout` — pass `onSubmit = onEnergize`. The existing `onEnergize` lambda already clears focus and early-returns on a blank prompt, so the Go key reuses the same code path. Captions intentionally left without an IME action (Enter means newline there). **C8**: `MemeCanvas` now tracks its rendered size with `onSizeChanged` and threads `parentSize: IntSize` to each `MemeTextOverlay`. The overlay tracks its own `positionInParent` via `onGloballyPositioned { coords -> positionInParent = coords.boundsInParent().topLeft }` and clamps drag by deriving the alignment anchor (`positionInParent - currentOffset`), clamping the desired absolute position to canvas bounds, then re-deriving the offset that would land there. Resize is also capped at parent dimensions so the handle can't grow the overlay past the canvas. Note: started with `coords.positionInParent()` per the original review sketch, but that extension wasn't resolving in Compose BoM 2026.05.01 even with the import; `boundsInParent().topLeft` is stable and gives the same value. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
 
@@ -262,19 +263,23 @@ Once the user presses Energize they cannot abort until the 120s timeout. Long pr
 
 **Implementation note:** swept three call sites (`MainActivity.onCreate` cache cleanup, `saveBitmapToGallery`, `shareBitmap`). `ImageRepository` did **not** have a `printStackTrace` to clean up — it swallows deletion errors silently and returns typed failures already, so nothing to do there.
 
-### C5. No status-bar / nav-bar inset handling on the Dock [P1 — visual cutoff]
+### C5. No status-bar / nav-bar inset handling on the Dock [P1 — visual cutoff] ✅ **DONE (PR 8, 2026-06-01)**
 **File:** `MainActivity.kt:27` (enableEdgeToEdge), `ui/MemeScreen.kt:1281+`
 
 `enableEdgeToEdge()` is enabled, but the Dock at the bottom of the CompactLayout has no `WindowInsets.navigationBars` padding. On 3-button-nav devices the Save/Share buttons can sit under the nav bar.
 
 **Action:** Apply `Modifier.windowInsetsPadding(WindowInsets.navigationBars)` to the Dock container (or to the Scaffold's bottom-content via `bottomBar = { Dock(...) }`).
 
-### C6. No IME action / soft-keyboard handling on inputs [P2]
+**Implementation note:** added `windowInsetsPadding(WindowInsets.navigationBars)` directly on the `Dock` Column in `MemeControls.kt`. Kept `Dock` as the inset boundary (rather than restructuring to a Scaffold `bottomBar`) — only `CompactLayout` calls `Dock`, so the change is contained and the tablet `ExpandedLayout` is unaffected. Comment in source notes that Scaffold without an explicit `bottomBar` does not always emit a bottom inset in its content paddingValues, which was the latent failure mode.
+
+### C6. No IME action / soft-keyboard handling on inputs [P2] ✅ **DONE (PR 8, 2026-06-01)**
 **File:** `ui/MemeScreen.kt` PromptInput, MemeTextOverlay
 
 `BasicTextField` defaults have no `KeyboardOptions(imeAction = ImeAction.Go)` for the prompt, no `onDone = { onEnergize() }`. Typing a prompt and hitting Enter does nothing.
 
 **Action:** Wire prompt input to submit on Done/Go.
+
+**Implementation note:** `PromptInput` gained an optional `onSubmit: (() -> Unit)? = null` parameter; the underlying `BasicTextField` now sets `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go)` and `keyboardActions = KeyboardActions(onGo = { onSubmit?.invoke() })`. Both call sites (`Dock` in compact, the right-column input in `ExpandedLayout`) pass `onSubmit = onEnergize`. `onEnergize` already clears focus and early-returns on a blank prompt, so the Go key reuses the same path as the Energize button. Caption overlays (`MemeTextOverlay`) were intentionally left without an IME action — multi-line meme captions want Enter to insert a newline, and there's no obvious second action they could trigger.
 
 ### C7. Hardcoded English strings in code [P2] ✅ **DONE (PR 6, 2026-05-30)**
 **File:** `ui/MemeScreen.kt:494,501,1236`
@@ -283,12 +288,14 @@ Once the user presses Energize they cannot abort until the 120s timeout. Long pr
 
 **Action:** Move to `strings.xml`.
 
-### C8. No bounds-clamping on text overlay drag [P1 — UX bug]
+### C8. No bounds-clamping on text overlay drag [P1 — UX bug] ✅ **DONE (PR 8, 2026-06-01)**
 **File:** `ui/MemeScreen.kt:992-998`
 
 `detectDragGestures` updates `offset` without clamping. Users can drag a text box completely off the canvas and lose it (the canvas clips at `RoundedCornerShape(20.dp)`; chrome appears only on focus, which is lost when not visible).
 
 **Action:** Clamp `offset` to canvas bounds in the drag handler (and clamp on size change).
+
+**Implementation note:** `MemeCanvas` now tracks its rendered size via `onSizeChanged` and threads `parentSize: IntSize` to each `MemeTextOverlay`. The overlay tracks its own `positionInParent` via `onGloballyPositioned { coords -> positionInParent = coords.boundsInParent().topLeft }` (note: used `boundsInParent().topLeft` — the `positionInParent()` extension function wasn't resolving in this Compose BoM, likely a packaging / API change; `boundsInParent()` is stable and gives the same value). The drag handler derives the alignment-based anchor as `positionInParent - currentOffset`, clamps the desired absolute position to `[0, parentWidth - overlayWidth] × [0, parentHeight - overlayHeight]`, then re-derives the offset that would land there. Net effect: the overlay rect cannot leave the canvas during drag. Resize is also capped — the previous `coerceAtLeast(minPx)` is now `coerceIn(minPx, parentDimension)`, so the resize handle can't be used to grow the overlay past the canvas.
 
 ### C9. Captions can overlap [P2]
 Top and bottom captions can be dragged onto each other with no detection. Minor; flag for UX.
@@ -545,10 +552,10 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | C2 | Performance | P2 | ✅ Layer records every frame *(PR 7, gated on `capturing`)* |
 | C3 | UX | P1 | No cancel during generation |
 | C4 | Logging | P3 | ✅ `printStackTrace` in code *(PR 1)* |
-| C5 | UX | P1 | No nav-bar inset on Dock |
-| C6 | UX | P2 | No IME action on inputs |
+| C5 | UX | P1 | ✅ No nav-bar inset on Dock *(PR 8, `windowInsetsPadding(WindowInsets.navigationBars)`)* |
+| C6 | UX | P2 | ✅ No IME action on inputs *(PR 8, `ImeAction.Go` → onEnergize)* |
 | C7 | i18n | P2 | ✅ Hardcoded English in code *(PR 6)* |
-| C8 | UX | P1 | No drag-bounds clamping |
+| C8 | UX | P1 | ✅ No drag-bounds clamping *(PR 8, clamp overlay rect inside canvas + cap resize)* |
 | C9 | UX | P2 | Caption collision unhandled |
 | C10 | Permissions | — | Pre-Q permission path verified |
 | C11 | Correctness | P2 | `shared_meme_*` files leak |
@@ -612,7 +619,7 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 5 — UX polish (out-of-band):** D18, D19, D20, D21. ✅ **landed 2026-05-29.** From running the app: materialize animation pacing + color, canvas/HUD spacing, multi-line prompt default, spacing scale unification. Inserted ahead of the original roadmap on user request.
 - **PR 6 — Typed errors:** B2, B5, C7. ✅ **landed 2026-05-30.** Sealed `GenerationOutcome` + `GenerationError`, Moshi error-body DTO, hardcoded English moved to resources.
 - **PR 7 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). ✅ **landed 2026-06-01.** `captureCleanBitmap()` now `delay(200)`s past the 160ms chrome fadeOut; `MemeCanvas`'s `drawWithContent` records only while `capturing`; caption delete shows an "Undo" snackbar that restores the pre-delete offset + size.
-- **PR 8 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 7)*
+- **PR 8 — Inputs, drag bounds, insets:** C5, C6, C8. ✅ **landed 2026-06-01.** Dock now lifts above the 3-button nav bar via `windowInsetsPadding(WindowInsets.navigationBars)`; the prompt input shows a "Go" IME action that fires Energize; caption drag clamps the rendered rect inside the canvas, and resize caps at parent dimensions.
 - **PR 9 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios). *(was PR 8)*
 - **PR 10 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling). *(was PR 9)*
 - **PR 11 — Repo + UI tests:** F1, F2, F3, F4. *(was PR 10)*

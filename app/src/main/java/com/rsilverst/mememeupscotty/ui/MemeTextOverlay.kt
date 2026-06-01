@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -91,6 +93,7 @@ internal fun MemeTextOverlay(
     size: Size?,
     onSizeChange: (Size) -> Unit,
     capturing: Boolean,
+    parentSize: IntSize,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -100,6 +103,7 @@ internal fun MemeTextOverlay(
     val minWidthPx = with(density) { 60.dp.toPx() }
     val minHeightPx = with(density) { 40.dp.toPx() }
     var currentRenderedSize by remember { mutableStateOf(IntSize.Zero) }
+    var positionInParent by remember { mutableStateOf(Offset.Zero) }
     var hasFocus by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
@@ -107,6 +111,9 @@ internal fun MemeTextOverlay(
     val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
     val latestSize by rememberUpdatedState(size)
     val latestOnSizeChange by rememberUpdatedState(onSizeChange)
+    val latestPositionInParent by rememberUpdatedState(positionInParent)
+    val latestRenderedSize by rememberUpdatedState(currentRenderedSize)
+    val latestParentSize by rememberUpdatedState(parentSize)
 
     val showChrome = hasFocus && !capturing
 
@@ -122,12 +129,28 @@ internal fun MemeTextOverlay(
             .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .then(sizeModifier)
             .onSizeChanged { currentRenderedSize = it }
+            .onGloballyPositioned { coords ->
+                positionInParent = coords.boundsInParent().topLeft
+            }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()
-                    latestOnOffsetChange(
-                        Offset(latestOffset.x + dragAmount.x, latestOffset.y + dragAmount.y)
-                    )
+                    // Clamp the drag so the overlay rect stays inside the
+                    // canvas. positionInParent already reflects the current
+                    // offset; we derive the anchor (where the overlay sits
+                    // when offset = Zero) so we can clamp the desired absolute
+                    // position rather than the offset delta directly.
+                    val w = latestRenderedSize.width.toFloat()
+                    val h = latestRenderedSize.height.toFloat()
+                    val maxX = (latestParentSize.width - w).coerceAtLeast(0f)
+                    val maxY = (latestParentSize.height - h).coerceAtLeast(0f)
+                    val anchorX = latestPositionInParent.x - latestOffset.x
+                    val anchorY = latestPositionInParent.y - latestOffset.y
+                    val desiredX = latestOffset.x + dragAmount.x
+                    val desiredY = latestOffset.y + dragAmount.y
+                    val clampedX = (anchorX + desiredX).coerceIn(0f, maxX) - anchorX
+                    val clampedY = (anchorY + desiredY).coerceIn(0f, maxY) - anchorY
+                    latestOnOffsetChange(Offset(clampedX, clampedY))
                 }
             }
             .drawBehind {
@@ -212,8 +235,10 @@ internal fun MemeTextOverlay(
                 onDrag = { dragAmount ->
                     val startW = latestSize?.width ?: currentRenderedSize.width.toFloat()
                     val startH = latestSize?.height ?: currentRenderedSize.height.toFloat()
-                    val newW = (startW + dragAmount.x).coerceAtLeast(minWidthPx)
-                    val newH = (startH + dragAmount.y).coerceAtLeast(minHeightPx)
+                    val parentW = latestParentSize.width.toFloat().coerceAtLeast(minWidthPx)
+                    val parentH = latestParentSize.height.toFloat().coerceAtLeast(minHeightPx)
+                    val newW = (startW + dragAmount.x).coerceIn(minWidthPx, parentW)
+                    val newH = (startH + dragAmount.y).coerceIn(minHeightPx, parentH)
                     latestOnSizeChange(Size(newW, newH))
                 }
             )

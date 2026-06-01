@@ -161,7 +161,8 @@ internal fun ExpandedLayout(
                 value = prompt,
                 onValueChange = onPromptChange,
                 singleLine = false,
-                minLines = 3
+                minLines = 3,
+                onSubmit = onEnergize
             )
 
             FieldLabel(text = stringResource(R.string.field_label_engine))

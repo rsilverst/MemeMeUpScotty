@@ -10,14 +10,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Casino
@@ -45,6 +50,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -171,13 +177,18 @@ internal fun Dock(
     onShare: () -> Unit
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        // Lift the Save/Share row above the 3-button nav bar in edge-to-edge
+        // mode. Scaffold without a bottomBar does not always emit a bottom
+        // inset in its content paddingValues, so we apply it explicitly.
+        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         PromptInput(
             value = prompt,
             onValueChange = onPromptChange,
             singleLine = false,
-            minLines = 3
+            minLines = 3,
+            onSubmit = onEnergize
         )
 
         EnergizeButton(
@@ -215,7 +226,8 @@ internal fun PromptInput(
     value: String,
     onValueChange: (String) -> Unit,
     singleLine: Boolean,
-    minLines: Int = 1
+    minLines: Int = 1,
+    onSubmit: (() -> Unit)? = null
 ) {
     var focused by remember { mutableStateOf(false) }
     val borderColor = if (focused) Plasma500 else Space500
@@ -248,6 +260,14 @@ internal fun PromptInput(
             minLines = effectiveMinLines,
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextHigh),
             cursorBrush = SolidColor(Plasma500),
+            // Show "Go" as the keyboard's action key so the user can fire
+            // Energize without dismissing the keyboard first. Multi-line
+            // mode keeps the separate Enter key for newlines; Go is the
+            // distinct IME action.
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(
+                onGo = { onSubmit?.invoke() }
+            ),
             modifier = Modifier
                 .weight(1f)
                 .onFocusChanged { focused = it.isFocused },

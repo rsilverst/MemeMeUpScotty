@@ -51,10 +51,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -100,6 +102,7 @@ internal fun MemeCanvas(
     var bottomOffset by remember { mutableStateOf(Offset.Zero) }
     var topSize by remember { mutableStateOf<Size?>(null) }
     var bottomSize by remember { mutableStateOf<Size?>(null) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val showControls = !capturing
 
     Box(
@@ -109,6 +112,7 @@ internal fun MemeCanvas(
             .clip(RoundedCornerShape(20.dp))
             .background(Space700)
             .border(1.dp, Space500, RoundedCornerShape(20.dp))
+            .onSizeChanged { canvasSize = it }
             // Record into the graphics layer only while capturing so Save /
             // Share can read a snapshot via graphicsLayer.toImageBitmap().
             // During normal use we just drawContent() directly — recording
@@ -154,6 +158,7 @@ internal fun MemeCanvas(
                     size = topSize,
                     onSizeChange = { topSize = it },
                     capturing = capturing,
+                    parentSize = canvasSize,
                     onDelete = {
                         val restoreOffset = topOffset
                         val restoreSize = topSize
@@ -190,6 +195,7 @@ internal fun MemeCanvas(
                     size = bottomSize,
                     onSizeChange = { bottomSize = it },
                     capturing = capturing,
+                    parentSize = canvasSize,
                     onDelete = {
                         val restoreOffset = bottomOffset
                         val restoreSize = bottomSize
