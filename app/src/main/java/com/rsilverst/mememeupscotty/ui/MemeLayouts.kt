@@ -46,7 +46,8 @@ internal fun CompactLayout(
     onEnergize: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
-    onPromptChip: (String) -> Unit
+    onPromptChip: (String) -> Unit,
+    onCaptionDeleted: (onUndo: () -> Unit) -> Unit
 ) {
     Column(
         modifier = modifier
@@ -62,7 +63,8 @@ internal fun CompactLayout(
             capturing = capturing,
             graphicsLayer = graphicsLayer,
             onPromptChip = onPromptChip,
-            onRetry = onEnergize
+            onRetry = onEnergize,
+            onCaptionDeleted = onCaptionDeleted
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -111,7 +113,8 @@ internal fun ExpandedLayout(
     onEnergize: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
-    onPromptChip: (String) -> Unit
+    onPromptChip: (String) -> Unit,
+    onCaptionDeleted: (onUndo: () -> Unit) -> Unit
 ) {
     Row(
         modifier = modifier
@@ -134,6 +137,7 @@ internal fun ExpandedLayout(
                 graphicsLayer = graphicsLayer,
                 onPromptChip = onPromptChip,
                 onRetry = onEnergize,
+                onCaptionDeleted = onCaptionDeleted,
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.height(20.dp))

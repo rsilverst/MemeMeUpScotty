@@ -18,6 +18,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **PR 6** | B2, B5, C7 | 2026-05-30 | Typed errors across the layer boundary. Introduced `GenerationOutcome` (`Success(file)` / `Failure(error)`) and `GenerationError` (`AuthRejected`, `OutOfCredit`, `ModelUnavailable`, `RateLimited(retryAfterSec)`, `Server(httpCode)`, `Timeout`, `Unexpected(detail)`) in `data/repository/ImageRepository.kt`. `ImageRepository.generateImage` now returns `GenerationOutcome`; repo's `errorFor` maps HTTP status → typed variant rather than building an English string. `GenerationState.Error` carries `GenerationError` instead of `String`. UI's `ErrorState` consumes the typed error via two pure mapping functions (`titleRes()`, `detailText()`) — the old `themedErrorTitle` keyword matcher is gone. Compile-time exhaustiveness now enforces UI updates when a variant is added. **B5**: `org.json.JSONObject` usage in `parseJsonField`/`parseJsonInt` replaced with a Moshi-codegen `ReplicateErrorBody` DTO; `NetworkModule` now exposes a shared `Moshi` instance that both Retrofit and the repo use. **C7**: hardcoded `"PROMPT"`, `"ENGINE"`, `"tap to change"` moved to `field_label_prompt`, `field_label_engine`, `hud_tap_to_change` in `strings.xml`. Test surface: `MockImageRepository` updated to new interface; added a third test asserting `AuthRejected` survives the repo → VM → state flow as the typed variant (not flattened). New strings: 7 detail resources (rate-limit has retry-with-seconds + no-retry variants) + a new `error_title_timeout` headline. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 | **PR 5** | D18, D19, D20, D21 | 2026-05-29 | UX polish batch from user testing. **D18**: `MemeCanvas.kt::LoadingState` — scan-line tween `2200ms → 1700ms` and replaced the single `pulseAlpha` with a `pulse` (0..1) that drives both `tint = lerp(Plasma500, Solar500, pulse).copy(alpha = 0.8 + 0.2*pulse)`, so the bolt warms to gold at peak per the mockup. **D20**: `PromptInput` gained a `minLines: Int = 1` parameter (guarded so a misconfigured caller with `singleLine = true` cannot crash BasicTextField); `Dock` and `ExpandedLayout` right-column now pass `minLines = 3`. **D19 + D21**: single-pass spacing rework. Canvas → HUD `12dp → 20dp` (both layouts), HUD → Dock `20dp → 24dp`, Dock vertical gap `12dp → 16dp`, expanded right column `18dp → 16dp`, paired Save/Share buttons `10dp → 8dp` (both layouts). `assembleDebug`, `assembleRelease`, `testDebugUnitTest` green. Note: this PR was inserted ahead of the original "PR 5 — Typed errors" item; subsequent PRs renumbered (+1) below. |
 | **PR 4** | B1 | 2026-05-29 | Split the 2,025-line `MemeScreen.kt` into 8 files in `ui/`: `MemeScreen.kt` (324 — root + `MemeContent` state hoisting + topbar + snackbar host), `MemeLayouts.kt` (209 — `CompactLayout`, `ExpandedLayout`, `FieldLabel`), `MemeCanvas.kt` (570 — canvas + idle/loading/error states + `TransporterPad` + `themedErrorTitle`), `MemeTextOverlay.kt` (353 — overlay + handles + `AddTextPill` + `findBestFitFontSize`), `MemeControls.kt` (454 — `HudStrip`, `Dock`, `PromptInput`, `EnergizeButton`, `GhostButton`), `ModelPicker.kt` (280 — selector + sheet + card), `ImageModelMetadata.kt` (52 — `shortLabel`/`shortGlyph`/`displayNameRes`/`descriptionRes` extension props on `ImageModel`, now `internal`), `PreviewShell.kt` (53 — shared `PREVIEW_BG`, `PreviewShell`, `PreviewCanvasFrame`). Visibility tightened: composables called cross-file are `internal`, leaf helpers stayed `private`. All previews moved next to their components. Slightly different from the per-component subpackages the original review sketched (kept flat `ui/` for 8 files); the renamed `MemeLayouts.kt` bundles both layouts since they're sibling concerns. Behavior preserved verbatim — caught one subtle drift mid-split (`.clip(CircleShape).background(...)` → `.background(..., CircleShape)` on `ResizeHandle`) and reverted to the original. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
+| **PR 7** | C1, C2, D3, D4 | 2026-06-01 | Capture correctness + undo for caption delete. **C1 + D4**: `captureCleanBitmap()` in `MemeScreen.kt` no longer waits a flat 2 frames before snapshotting — it now `delay(200)`s, which covers the 160ms fadeOut tween on the resize handle / delete chip's `AnimatedVisibility` exit transitions plus a small buffer. The saved bitmap no longer catches mid-fade chrome. Named constant `CAPTURE_CHROME_FADE_BUFFER_MS = 200L` with a comment pointing at the source-of-truth tween duration in `MemeTextOverlay.kt`. **C2**: `MemeCanvas.kt`'s `drawWithContent` block now branches on `capturing`: `if (capturing) { graphicsLayer.record { drawContent() } ; drawLayer(graphicsLayer) } else { drawContent() }`. The canvas no longer pays the layer-record cost on every recomposition during normal use; the layer is populated by the first frame after `capturing` flips true, which the 200ms delay then waits past. **D3**: deleting a caption no longer silently wipes the offset / size. Each `onDelete` lambda in `MemeCanvas` snapshots `(offset, size)` before clearing, then calls the new `onCaptionDeleted: (onUndo: () -> Unit) -> Unit` callback. `MemeContent` provides that callback: shows a `SnackbarDuration.Short` snackbar reading "Text box removed." with an "Undo" action that fires the restore lambda. The caption text itself is preserved by the existing `topText`/`bottomText` state in `MemeContent` (delete only affects visibility + transform), so undo restores everything. New strings: `caption_removed`, `undo`. `onCaptionDeleted` plumbed through `CompactLayout` and `ExpandedLayout`. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
 
@@ -217,7 +218,7 @@ The `label` field on `ImageModel` is unused — UI now reads `displayNameRes` vi
 
 # Group C — Code Correctness, Threading, Performance (P1–P2)
 
-### C1. GraphicsLayer capture timing is racy [P1]
+### C1. GraphicsLayer capture timing is racy [P1] ✅ **DONE (PR 7, 2026-06-01)**
 **File:** `ui/MemeScreen.kt:249-256`
 
 ```kotlin
@@ -234,12 +235,16 @@ Chrome (delete chip, resize handle) is animated out with `AnimatedVisibility(...
 
 **Action:** Either use `snap()` for the chrome exit during capture, or replace the `withFrameNanos` wait with a `snapshotFlow { showChrome }.first { !it }` confirmation, then capture.
 
-### C2. `graphicsLayer.record` runs on every recomposition of the canvas [P2]
+**Implementation note:** went with the simplest robust fix — replaced the two `withFrameNanos { }` calls with a single `kotlinx.coroutines.delay(CAPTURE_CHROME_FADE_BUFFER_MS)` (200ms). That covers the 160ms tween plus a small buffer so the recorded layer is clean by the time we snapshot. `snapshotFlow` won't observe the `AnimatedVisibility` exit animation (alpha is internal to the modifier), so the delay was the cleaner option. The constant lives next to `MemeContent` with a comment pointing back at `MemeTextOverlay.kt`'s tween duration as the source of truth.
+
+### C2. `graphicsLayer.record` runs on every recomposition of the canvas [P2] ✅ **DONE (PR 7, 2026-06-01)**
 **File:** `ui/MemeScreen.kt:582-587`
 
 The `drawWithContent { graphicsLayer.record { … } drawLayer(graphicsLayer) }` block always records, even outside capture. Each recomposition pays the layer-record cost.
 
 **Action:** Only record while `capturing` (or guarded by a "needs new snapshot" flag).
+
+**Implementation note:** the `drawWithContent` block in `MemeCanvas.kt` now branches on `capturing`: it records into the layer + draws via `drawLayer(graphicsLayer)` only while `capturing`, and falls through to a plain `drawContent()` during normal use. Because `capturing` is a state read inside the draw block, flipping it true causes one immediate re-record; the C1 200ms delay then sits on top of that so the layer is current by the time `toImageBitmap()` runs.
 
 ### C3. Polling has no cancel UX [P1]
 **File:** `data/repository/ImageRepository.kt:74-85`, `ui/MemeScreen.kt` (Energize button)
@@ -317,13 +322,14 @@ Compact layout has a scrollable column but no outer `clickable` to clear focus. 
 ### D2. Disabled Save/Share has no tooltip [P3]
 When `generationState` is not Success, the buttons are visibly dim but the user has no inline explanation. The snackbar fallback ("Nothing to save yet.") only fires on click. Consider an inline helper text.
 
-### D3. No undo when deleting a text overlay [P1]
+### D3. No undo when deleting a text overlay [P1] ✅ **DONE (PR 7, 2026-06-01)**
 Tap the X on a caption → caption gone, no confirmation, no undo, typed text lost. For a meme app this is brutal.
 
 **Action:** On delete, show a snackbar with "Undo" that restores the previous text + offset + size for ~5s.
 
-### D4. Capture catches mid-animation chrome [P1]
-See C1. Visual: saved memes occasionally include a faint trace of the resize handle.
+**Implementation note:** the caption text actually lives in `MemeContent`'s `topText`/`bottomText` state — `onDelete` only flips visibility and zeroes the transform, so the text was never lost. What was lost was the position/size. The fix: each `onDelete` lambda in `MemeCanvas.kt` snapshots `(offset, size)` before clearing, then calls a new `onCaptionDeleted: (onUndo: () -> Unit) -> Unit` callback. `MemeContent` provides it and shows a `SnackbarDuration.Short` snackbar with an "Undo" action that fires the restore lambda. New strings: `caption_removed`, `undo`. Short duration (~4s) is close to the recommended "~5s"; switched off the explicit timeline so the standard M3 snackbar UX applies consistently with the rest of the app's snackbars.
+
+### D4. Capture catches mid-animation chrome [P1] ✅ **DONE (PR 7, 2026-06-01)** — see C1
 
 ### D5. Empty-state suggestions are tap-to-fill, not tap-to-generate [P2]
 Tapping a suggested prompt fills the input but the user still has to scroll/find Energize. Recommend tap-to-fill-AND-generate, or add a "Use & generate" affordance.
@@ -535,8 +541,8 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | B7 | Correctness | P1 | ✅ Photorealistic suffix on stylized models *(PR 3, also expanded artifact negatives)* |
 | B8 | Architecture | P2 | NetworkModule has no swappable seam |
 | B9 | Cleanup | P3 | Dead `ImageModel.label` field |
-| C1 | Correctness | P1 | GraphicsLayer capture is racy |
-| C2 | Performance | P2 | Layer records every frame |
+| C1 | Correctness | P1 | ✅ GraphicsLayer capture is racy *(PR 7, `delay(200)` covers fadeOut)* |
+| C2 | Performance | P2 | ✅ Layer records every frame *(PR 7, gated on `capturing`)* |
 | C3 | UX | P1 | No cancel during generation |
 | C4 | Logging | P3 | ✅ `printStackTrace` in code *(PR 1)* |
 | C5 | UX | P1 | No nav-bar inset on Dock |
@@ -549,8 +555,8 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | C12 | UX | P2 | No loading progress |
 | D1 | UX | P2 | No tap-outside-to-dismiss |
 | D2 | UX | P3 | Disabled buttons silent |
-| D3 | UX | P1 | No undo for caption delete |
-| D4 | UX | P1 | Capture catches animating chrome |
+| D3 | UX | P1 | ✅ No undo for caption delete *(PR 7, "Undo" snackbar restores offset + size)* |
+| D4 | UX | P1 | ✅ Capture catches animating chrome *(PR 7, see C1)* |
 | D5 | UX | P2 | Suggestions fill but don't generate |
 | D6 | UX | P3 | No clear button on prompt |
 | D7 | UX | P3 | Energize label outdated |
@@ -605,7 +611,7 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 4 — Split MemeScreen:** B1. ✅ **landed 2026-05-29.** 8 files in `ui/`, flat package, behavior preserved.
 - **PR 5 — UX polish (out-of-band):** D18, D19, D20, D21. ✅ **landed 2026-05-29.** From running the app: materialize animation pacing + color, canvas/HUD spacing, multi-line prompt default, spacing scale unification. Inserted ahead of the original roadmap on user request.
 - **PR 6 — Typed errors:** B2, B5, C7. ✅ **landed 2026-05-30.** Sealed `GenerationOutcome` + `GenerationError`, Moshi error-body DTO, hardcoded English moved to resources.
-- **PR 7 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). *(was PR 6)*
+- **PR 7 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). ✅ **landed 2026-06-01.** `captureCleanBitmap()` now `delay(200)`s past the 160ms chrome fadeOut; `MemeCanvas`'s `drawWithContent` records only while `capturing`; caption delete shows an "Undo" snackbar that restores the pre-delete offset + size.
 - **PR 8 — Inputs, drag bounds, insets:** C5, C6, C8. *(was PR 7)*
 - **PR 9 — Product expansion vol. 1:** E1 (image source picker), E3 (aspect ratios). *(was PR 8)*
 - **PR 10 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling). *(was PR 9)*

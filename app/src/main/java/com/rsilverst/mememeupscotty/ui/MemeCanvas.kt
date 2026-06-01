@@ -91,6 +91,7 @@ internal fun MemeCanvas(
     graphicsLayer: GraphicsLayer,
     onPromptChip: (String) -> Unit,
     onRetry: () -> Unit,
+    onCaptionDeleted: (onUndo: () -> Unit) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var topVisible by remember { mutableStateOf(true) }
@@ -108,11 +109,19 @@ internal fun MemeCanvas(
             .clip(RoundedCornerShape(20.dp))
             .background(Space700)
             .border(1.dp, Space500, RoundedCornerShape(20.dp))
+            // Record into the graphics layer only while capturing so Save /
+            // Share can read a snapshot via graphicsLayer.toImageBitmap().
+            // During normal use we just drawContent() directly — recording
+            // every frame doubled draw work for no benefit.
             .drawWithContent {
-                graphicsLayer.record {
-                    this@drawWithContent.drawContent()
+                if (capturing) {
+                    graphicsLayer.record {
+                        this@drawWithContent.drawContent()
+                    }
+                    drawLayer(graphicsLayer)
+                } else {
+                    drawContent()
                 }
-                drawLayer(graphicsLayer)
             },
         contentAlignment = Alignment.Center
     ) {
@@ -146,9 +155,16 @@ internal fun MemeCanvas(
                     onSizeChange = { topSize = it },
                     capturing = capturing,
                     onDelete = {
+                        val restoreOffset = topOffset
+                        val restoreSize = topSize
                         topVisible = false
                         topOffset = Offset.Zero
                         topSize = null
+                        onCaptionDeleted {
+                            topVisible = true
+                            topOffset = restoreOffset
+                            topSize = restoreSize
+                        }
                     },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -175,9 +191,16 @@ internal fun MemeCanvas(
                     onSizeChange = { bottomSize = it },
                     capturing = capturing,
                     onDelete = {
+                        val restoreOffset = bottomOffset
+                        val restoreSize = bottomSize
                         bottomVisible = false
                         bottomOffset = Offset.Zero
                         bottomSize = null
+                        onCaptionDeleted {
+                            bottomVisible = true
+                            bottomOffset = restoreOffset
+                            bottomSize = restoreSize
+                        }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

@@ -15,8 +15,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -28,7 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -53,6 +54,7 @@ import com.rsilverst.mememeupscotty.ui.theme.TextHigh
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Single-screen entry point. Owns top-level state (selected model, picker
@@ -197,13 +199,29 @@ private fun MemeContent(
     val nothingToSave = stringResource(R.string.nothing_to_save)
     val nothingToShare = stringResource(R.string.nothing_to_share)
 
+    // The chrome (resize handle + delete chip) exits via a 160ms fadeOut.
+    // Waiting two frames (~32ms) was racy — the saved bitmap occasionally
+    // caught a half-faded handle. 200ms covers the tween plus a small
+    // buffer so the recorded layer is clean by the time we snapshot.
     suspend fun captureCleanBitmap(): android.graphics.Bitmap {
         capturing = true
-        withFrameNanos { }
-        withFrameNanos { }
+        delay(CAPTURE_CHROME_FADE_BUFFER_MS)
         val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
         capturing = false
         return bitmap
+    }
+
+    val captionRemoved = stringResource(R.string.caption_removed)
+    val undoLabel = stringResource(R.string.undo)
+    val onCaptionDeleted: (onUndo: () -> Unit) -> Unit = { onUndo ->
+        coroutineScope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = captionRemoved,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) onUndo()
+        }
     }
 
     val performSave = {
@@ -288,7 +306,8 @@ private fun MemeContent(
             onEnergize = onEnergize,
             onSave = onSaveAction,
             onShare = onShareAction,
-            onPromptChip = onPromptChipClick
+            onPromptChip = onPromptChipClick,
+            onCaptionDeleted = onCaptionDeleted
         )
     } else {
         CompactLayout(
@@ -308,10 +327,15 @@ private fun MemeContent(
             onEnergize = onEnergize,
             onSave = onSaveAction,
             onShare = onShareAction,
-            onPromptChip = onPromptChipClick
+            onPromptChip = onPromptChipClick,
+            onCaptionDeleted = onCaptionDeleted
         )
     }
 }
+
+// Long enough for the 160ms chrome fadeOut tween to settle plus a small
+// buffer; see MemeTextOverlay's AnimatedVisibility exit transitions.
+private const val CAPTURE_CHROME_FADE_BUFFER_MS = 200L
 
 @Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 72)
 @Composable

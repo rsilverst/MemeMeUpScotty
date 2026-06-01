@@ -64,6 +64,8 @@
     <string name="edit_text_box">Edit text</string>
     <string name="add_top_text">Add top text</string>
     <string name="add_bottom_text">Add bottom text</string>
+    <string name="caption_removed">Text box removed.</string>
+    <string name="undo">Undo</string>
 
     <!-- Model picker -->
     <string name="choose_engine">Choose engine</string>
