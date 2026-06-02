@@ -1,14 +1,19 @@
 package com.rsilverst.mememeupscotty.ui
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,6 +24,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rsilverst.mememeupscotty.R
@@ -26,7 +33,10 @@ import com.rsilverst.mememeupscotty.ui.theme.TextLow
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 
-// Phone layout: canvas + HUD + Dock stacked vertically with scroll.
+// Phone layout: all controls (prompt, model picker, Energize) sit above
+// the canvas so the soft keyboard never covers the inputs; the canvas
+// shows the result; Save/Share sits at the bottom carrying the
+// navigationBars inset for edge-to-edge clearance.
 
 @Composable
 internal fun CompactLayout(
@@ -49,11 +59,51 @@ internal fun CompactLayout(
     onPromptChip: (String) -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
     Column(
         modifier = modifier
             .padding(horizontal = 16.dp)
+            // Tap outside any text field to dismiss focus + keyboard. Taps on
+            // BasicTextFields are consumed by their own focus handlers and do
+            // not bubble up, so this only fires for "empty space" taps.
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusManager.clearFocus() })
+            }
+            // Shrink the scroll viewport by the IME height when the keyboard
+            // opens. Combined with BasicTextField's default bring-into-view
+            // on focus, this lets tapping a caption (especially the bottom
+            // one) auto-scroll the caption above the keyboard instead of
+            // leaving it occluded.
+            .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
+        PromptInput(
+            value = prompt,
+            onValueChange = onPromptChange,
+            singleLine = false,
+            minLines = 3,
+            onSubmit = onEnergize
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        HudStrip(
+            selectedModel = selectedModel,
+            generationState = generationState,
+            onOpenModelPicker = onOpenModelPicker,
+            onReroll = onEnergize
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        EnergizeButton(
+            generationState = generationState,
+            hasGeneratedImage = hasGeneratedImage,
+            onClick = onEnergize
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         MemeCanvas(
             generationState = generationState,
             topText = topText,
@@ -69,24 +119,29 @@ internal fun CompactLayout(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        HudStrip(
-            selectedModel = selectedModel,
-            generationState = generationState,
-            onOpenModelPicker = onOpenModelPicker,
-            onReroll = onEnergize
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Dock(
-            prompt = prompt,
-            onPromptChange = onPromptChange,
-            generationState = generationState,
-            hasGeneratedImage = hasGeneratedImage,
-            onEnergize = onEnergize,
-            onSave = onSave,
-            onShare = onShare
-        )
+        val isLoading = generationState is GenerationState.Loading
+        val hasImage = generationState is GenerationState.Success
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GhostButton(
+                icon = Icons.Filled.Download,
+                label = stringResource(R.string.save),
+                enabled = !isLoading && hasImage,
+                onClick = onSave,
+                modifier = Modifier.weight(1f)
+            )
+            GhostButton(
+                icon = Icons.Filled.IosShare,
+                label = stringResource(R.string.share),
+                enabled = !isLoading && hasImage,
+                onClick = onShare,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
     }

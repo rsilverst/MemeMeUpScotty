@@ -6,19 +6,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,8 +22,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Casino
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -156,66 +150,6 @@ private fun HudIconButton(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 modifier = Modifier.size(16.dp)
-            )
-        }
-    }
-}
-
-// ============================================================================
-// Dock — bottom prompt + Energize + Save/Share row (compact layout only).
-// Expanded layout assembles these same controls in its own column.
-// ============================================================================
-
-@Composable
-internal fun Dock(
-    prompt: String,
-    onPromptChange: (String) -> Unit,
-    generationState: GenerationState,
-    hasGeneratedImage: Boolean,
-    onEnergize: () -> Unit,
-    onSave: () -> Unit,
-    onShare: () -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        // Lift the Save/Share row above the 3-button nav bar in edge-to-edge
-        // mode. Scaffold without a bottomBar does not always emit a bottom
-        // inset in its content paddingValues, so we apply it explicitly.
-        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
-    ) {
-        PromptInput(
-            value = prompt,
-            onValueChange = onPromptChange,
-            singleLine = false,
-            minLines = 3,
-            onSubmit = onEnergize
-        )
-
-        EnergizeButton(
-            generationState = generationState,
-            hasGeneratedImage = hasGeneratedImage,
-            onClick = onEnergize
-        )
-
-        val isLoading = generationState is GenerationState.Loading
-        val hasImage = generationState is GenerationState.Success
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GhostButton(
-                icon = Icons.Filled.Download,
-                label = stringResource(R.string.save),
-                enabled = !isLoading && hasImage,
-                onClick = onSave,
-                modifier = Modifier.weight(1f)
-            )
-            GhostButton(
-                icon = Icons.Filled.IosShare,
-                label = stringResource(R.string.share),
-                enabled = !isLoading && hasImage,
-                onClick = onShare,
-                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -447,34 +381,3 @@ private fun PromptInputPreview_Filled() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 280)
-@Composable
-private fun DockPreview_NoImage() {
-    PreviewShell {
-        Dock(
-            prompt = "",
-            onPromptChange = {},
-            generationState = GenerationState.Idle,
-            hasGeneratedImage = false,
-            onEnergize = {},
-            onSave = {},
-            onShare = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 280)
-@Composable
-private fun DockPreview_WithImage() {
-    PreviewShell {
-        Dock(
-            prompt = "a corgi as the captain",
-            onPromptChange = {},
-            generationState = GenerationState.Success(File("")),
-            hasGeneratedImage = true,
-            onEnergize = {},
-            onSave = {},
-            onShare = {}
-        )
-    }
-}
