@@ -1,5 +1,6 @@
 package com.rsilverst.mememeupscotty.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -66,6 +67,7 @@ import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Red500
+import com.rsilverst.mememeupscotty.ui.theme.Photon500
 import com.rsilverst.mememeupscotty.ui.theme.Solar500
 import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space700
@@ -94,7 +96,7 @@ internal fun MemeCanvas(
     onPromptChip: (String) -> Unit,
     onRetry: () -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit = {},
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     var topVisible by remember { mutableStateOf(true) }
     var bottomVisible by remember { mutableStateOf(true) }
@@ -258,9 +260,17 @@ private fun EmptyState(onPromptChip: (String) -> Unit) {
             stringResource(R.string.suggested_prompt_2),
             stringResource(R.string.suggested_prompt_3)
         )
-        chips.forEach { chip ->
+        chips.forEachIndexed { index, chip ->
+            val color = when (index) {
+                0 -> Plasma500
+                1 -> Photon500
+                else -> Solar500
+            }
             PromptChip(
                 label = chip,
+                borderColor = color.copy(alpha = 0.40f),
+                textColor = color.copy(alpha = 0.90f),
+                backgroundColor = color.copy(alpha = 0.06f),
                 onClick = { onPromptChip(chip) }
             )
             Spacer(Modifier.height(8.dp))
@@ -269,13 +279,19 @@ private fun EmptyState(onPromptChip: (String) -> Unit) {
 }
 
 @Composable
-private fun PromptChip(label: String, onClick: () -> Unit) {
+private fun PromptChip(
+    label: String,
+    borderColor: Color,
+    textColor: Color,
+    backgroundColor: Color,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.04f),
-        border = BorderStroke(1.dp, Space500),
-        contentColor = TextMid
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor),
+        contentColor = textColor
     ) {
         Text(
             text = label,

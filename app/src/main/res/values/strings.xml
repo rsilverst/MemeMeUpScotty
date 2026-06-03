@@ -6,14 +6,14 @@
 
     <!-- Idle / empty state -->
     <string name="idle_instruction">Tell us what to materialize.</string>
-    <string name="idle_try_one">Try one of these</string>
+    <string name="idle_try_one">Or try one of these</string>
     <string name="suggested_prompt_1">a corgi as the captain</string>
     <string name="suggested_prompt_2">spock holding a banana</string>
     <string name="suggested_prompt_3">the bridge, but tiny</string>
 
     <!-- Primary CTA -->
     <string name="generate">Energize</string>
-    <string name="regenerate">Energize Again</string>
+    <string name="regenerate">Re-energize</string>
     <string name="generating">Energizing&#8230;</string>
     <string name="materializing">Materializing</string>
 

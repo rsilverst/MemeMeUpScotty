@@ -1,6 +1,7 @@
 package com.rsilverst.mememeupscotty.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,6 +57,7 @@ import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 // Single-screen entry point. Owns top-level state (selected model, picker
 // open, snackbar host) and dispatches to the compact or expanded layout
@@ -120,7 +122,9 @@ private fun deepSpaceBrush(): Brush =
     Brush.verticalGradient(
         colors = listOf(
             Space900,
-            Color(0xFF0D1128),
+            Color(0xFF151233), // Deep cosmic indigo
+            Color(0xFF2E1135), // Warm nebula purple/magenta
+            Color(0xFF0C2436), // Cold space teal
             Space900
         )
     )
@@ -169,6 +173,7 @@ private fun StardateSnackbarHost(hostState: SnackbarHostState) {
 // presentation given this state + these callbacks.
 // ============================================================================
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 private fun MemeContent(
     modifier: Modifier = Modifier,
@@ -205,7 +210,7 @@ private fun MemeContent(
     // buffer so the recorded layer is clean by the time we snapshot.
     suspend fun captureCleanBitmap(): android.graphics.Bitmap {
         capturing = true
-        delay(CAPTURE_CHROME_FADE_BUFFER_MS)
+        delay(CAPTURE_CHROME_FADE_BUFFER_MS.milliseconds)
         val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
         capturing = false
         return bitmap
