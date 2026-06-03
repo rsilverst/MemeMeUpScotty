@@ -69,6 +69,27 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> 
     }
 }
 
+// Streams a content:// URI (e.g. from the system photo picker) into a
+// cache file that the canvas can read like any other File. Coil reads
+// from the file path, so the original picker URI permission is not
+// needed beyond the copy itself.
+suspend fun copyUriToCache(context: Context, uri: Uri, cacheDir: File): Result<File> {
+    val appContext = context.applicationContext
+    return withContext(Dispatchers.IO) {
+        try {
+            val file = File.createTempFile("gallery_meme_", ".img", cacheDir)
+            appContext.contentResolver.openInputStream(uri).use { input ->
+                input ?: throw Exception("Failed to open picked image")
+                file.outputStream().use { output -> input.copyTo(output) }
+            }
+            Result.success(file)
+        } catch (e: Exception) {
+            Log.w(TAG, "copyUriToCache failed", e)
+            Result.failure(e)
+        }
+    }
+}
+
 suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
     val appContext = context.applicationContext
     return try {

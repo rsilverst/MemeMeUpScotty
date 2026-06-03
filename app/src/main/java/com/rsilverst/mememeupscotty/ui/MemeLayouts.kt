@@ -57,7 +57,8 @@ internal fun CompactLayout(
     onSave: () -> Unit,
     onShare: () -> Unit,
     onPromptChip: (String) -> Unit,
-    onCaptionDeleted: (onUndo: () -> Unit) -> Unit
+    onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
+    onPickImage: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     Column(
@@ -114,7 +115,8 @@ internal fun CompactLayout(
             graphicsLayer = graphicsLayer,
             onPromptChip = onPromptChip,
             onRetry = onEnergize,
-            onCaptionDeleted = onCaptionDeleted
+            onCaptionDeleted = onCaptionDeleted,
+            onPickImage = onPickImage
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -169,7 +171,8 @@ internal fun ExpandedLayout(
     onSave: () -> Unit,
     onShare: () -> Unit,
     onPromptChip: (String) -> Unit,
-    onCaptionDeleted: (onUndo: () -> Unit) -> Unit
+    onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
+    onPickImage: () -> Unit
 ) {
     Row(
         modifier = modifier
@@ -193,6 +196,7 @@ internal fun ExpandedLayout(
                 onPromptChip = onPromptChip,
                 onRetry = onEnergize,
                 onCaptionDeleted = onCaptionDeleted,
+                onPickImage = onPickImage,
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.height(20.dp))

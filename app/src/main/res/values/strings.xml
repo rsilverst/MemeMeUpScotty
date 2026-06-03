@@ -67,6 +67,10 @@
     <string name="caption_removed">Text box removed.</string>
     <string name="undo">Undo</string>
 
+    <!-- Image source -->
+    <string name="use_photo">Use a photo</string>
+    <string name="load_image_failed">Couldn\'t load that image.</string>
+
     <!-- Model picker -->
     <string name="choose_engine">Choose engine</string>
     <string name="model_active">Active</string>

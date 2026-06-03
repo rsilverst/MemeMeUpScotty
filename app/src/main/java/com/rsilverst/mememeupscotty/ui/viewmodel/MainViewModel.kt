@@ -45,6 +45,21 @@ class MainViewModel(
         _selectedModel.value = model
     }
 
+    // Swap the canvas image to one the caller has already materialised on
+    // disk (e.g. a copy of a gallery URI). The previous tracked file is
+    // deleted so cache doesn't accumulate.
+    fun setLoadedImage(file: File) {
+        lastGeneratedFile?.let { previous ->
+            try {
+                if (previous.exists()) previous.delete()
+            } catch (_: Exception) {
+                // Suppress deletion errors
+            }
+        }
+        lastGeneratedFile = file
+        _generationState.value = GenerationState.Success(file)
+    }
+
     fun generateImage(prompt: String, cacheDir: File) {
         viewModelScope.launch {
             _generationState.value = GenerationState.Loading

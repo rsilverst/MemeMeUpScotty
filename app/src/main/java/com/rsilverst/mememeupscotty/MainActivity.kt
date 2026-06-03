@@ -29,11 +29,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Proactive cleanup of orphaned generated memes bound to activity lifecycle
+        // Proactive cleanup of orphaned cache files bound to activity lifecycle:
+        // - generated_meme_* : AI generations (downloaded by ImageRepository)
+        // - gallery_meme_*   : copies of user-picked photos
+        // - shared_meme_*    : FileProvider-shared bitmaps from the share sheet
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 cacheDir?.listFiles()?.forEach { file ->
-                    if (file.name.startsWith("generated_meme_")) {
+                    val name = file.name
+                    if (name.startsWith("generated_meme_") ||
+                        name.startsWith("gallery_meme_") ||
+                        name.startsWith("shared_meme_")
+                    ) {
                         file.delete()
                     }
                 }

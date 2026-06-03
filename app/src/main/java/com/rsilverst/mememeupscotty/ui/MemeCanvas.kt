@@ -1,12 +1,15 @@
 package com.rsilverst.mememeupscotty.ui
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -96,6 +100,7 @@ internal fun MemeCanvas(
     onPromptChip: (String) -> Unit,
     onRetry: () -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit = {},
+    onPickImage: () -> Unit = {},
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     var topVisible by remember { mutableStateOf(true) }
@@ -146,6 +151,22 @@ internal fun MemeCanvas(
                 error = generationState.error,
                 onRetry = onRetry
             )
+        }
+
+        // Persistent "Use a photo" affordance pinned to the canvas
+        // top-right. Visible in every canvas state — idle (primary
+        // discoverability), loading, success (acts as "replace"), and
+        // error — and fades only during capture so it never leaks into
+        // a saved/shared bitmap.
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(160)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        ) {
+            PhotoSourceChip(onClick = onPickImage)
         }
 
         // Captions only make sense once there's an image to put them on.
@@ -274,6 +295,39 @@ private fun EmptyState(onPromptChip: (String) -> Unit) {
                 onClick = { onPromptChip(chip) }
             )
             Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// Persistent source-picker chip pinned to the canvas top-right corner.
+// Labeled (icon + text) so its purpose is obvious in every state — not
+// just an unmarked overlay glyph. Semi-opaque dark fill so it reads
+// against any generated image without depending on the underlying hue.
+@Composable
+private fun PhotoSourceChip(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = Space900.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, Plasma500.copy(alpha = 0.40f)),
+        contentColor = TextHigh,
+        modifier = Modifier.height(32.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Image,
+                contentDescription = null,
+                tint = Plasma500,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = stringResource(R.string.use_photo),
+                style = MaterialTheme.typography.labelMedium
+            )
         }
     }
 }

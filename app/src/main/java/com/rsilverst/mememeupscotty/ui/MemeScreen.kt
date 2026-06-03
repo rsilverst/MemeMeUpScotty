@@ -3,8 +3,10 @@ package com.rsilverst.mememeupscotty.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -203,6 +205,7 @@ private fun MemeContent(
     val storagePermissionRequired = stringResource(R.string.storage_permission_required)
     val nothingToSave = stringResource(R.string.nothing_to_save)
     val nothingToShare = stringResource(R.string.nothing_to_share)
+    val loadImageFailed = stringResource(R.string.load_image_failed)
 
     // The chrome (resize handle + delete chip) exits via a 160ms fadeOut.
     // Waiting two frames (~32ms) was racy — the saved bitmap occasionally
@@ -293,6 +296,29 @@ private fun MemeContent(
         prompt = suggestion
     }
 
+    // System Photo Picker — no runtime permission needed; returns null on
+    // cancel. On success we stream the URI to a cache file off the main
+    // thread, then hand the File to the VM as the new canvas image.
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                copyUriToCache(context, uri, context.cacheDir).fold(
+                    onSuccess = { file -> viewModel.setLoadedImage(file) },
+                    onFailure = { snackbarHostState.showSnackbar(loadImageFailed) }
+                )
+            }
+        }
+    }
+
+    val onPickImage: () -> Unit = {
+        focusManager.clearFocus()
+        photoPickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+    }
+
     if (isExpanded) {
         ExpandedLayout(
             modifier = modifier,
@@ -312,7 +338,8 @@ private fun MemeContent(
             onSave = onSaveAction,
             onShare = onShareAction,
             onPromptChip = onPromptChipClick,
-            onCaptionDeleted = onCaptionDeleted
+            onCaptionDeleted = onCaptionDeleted,
+            onPickImage = onPickImage
         )
     } else {
         CompactLayout(
@@ -333,7 +360,8 @@ private fun MemeContent(
             onSave = onSaveAction,
             onShare = onShareAction,
             onPromptChip = onPromptChipClick,
-            onCaptionDeleted = onCaptionDeleted
+            onCaptionDeleted = onCaptionDeleted,
+            onPickImage = onPickImage
         )
     }
 }
