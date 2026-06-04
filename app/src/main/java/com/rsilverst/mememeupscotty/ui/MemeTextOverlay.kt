@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -157,28 +158,42 @@ internal fun MemeTextOverlay(
                     val clampedY = (anchorY + desiredY).coerceIn(0f, maxY) - anchorY
                     latestOnOffsetChange(Offset(clampedX, clampedY))
                 }
-            }
-            .drawBehind {
-                if (showChrome) {
-                    val pad = 8.dp.toPx()
-                    drawRoundRect(
-                        color = Plasma500,
-                        topLeft = Offset(-pad, -pad),
-                        size = Size(this.size.width + pad * 2, this.size.height + pad * 2),
-                        cornerRadius = CornerRadius(6.dp.toPx()),
-                        style = Stroke(
-                            width = 1.5.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
-                        )
-                    )
-                }
             },
         contentAlignment = Alignment.Center
     ) {
-        BoxWithConstraints {
+        val innerModifier = if (size != null) {
+            Modifier.fillMaxSize().padding(18.dp)
+        } else {
+            Modifier.padding(18.dp)
+        }
+
+        // Visual padded inner box representing the dashed text bounds
+        Box(
+            modifier = innerModifier
+                .drawBehind {
+                    if (showChrome) {
+                        val pad = 8.dp.toPx()
+                        drawRoundRect(
+                            color = Plasma500,
+                            topLeft = Offset(-pad, -pad),
+                            size = Size(this.size.width + pad * 2, this.size.height + pad * 2),
+                            cornerRadius = CornerRadius(6.dp.toPx()),
+                            style = Stroke(
+                                width = 1.5.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+                            )
+                        )
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            BoxWithConstraints {
             val maxWidthPx = constraints.maxWidth
-            val maxHeightPx = size?.height?.toInt()
-                ?: with(density) { 96.dp.toPx() }.toInt()
+            val maxHeightPx = if (size != null) {
+                (size.height - with(density) { 36.dp.toPx() }).toInt().coerceAtLeast(0)
+            } else {
+                with(density) { 96.dp.toPx() }.toInt()
+            }
             val displayText = value.ifEmpty { placeholder }
             val fontSize = remember(displayText, maxWidthPx, maxHeightPx, fontFamily, fontWeight) {
                 findBestFitFontSize(displayText, textMeasurer, fontFamily, fontWeight, maxWidthPx, maxHeightPx)
@@ -227,7 +242,8 @@ internal fun MemeTextOverlay(
                     }
                 }
             )
-        }
+        } // End of BoxWithConstraints
+        } // End of inner Box
 
         // Selection chrome: floating delete chip + resize handle
         AnimatedVisibility(
@@ -255,7 +271,10 @@ internal fun MemeTextOverlay(
             exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            DeleteChip(onClick = onDelete)
+            DeleteChip(
+                onClick = onDelete,
+                modifier = Modifier.offset(x = (-2).dp, y = 2.dp)
+            )
         }
 
         AnimatedVisibility(
@@ -264,16 +283,18 @@ internal fun MemeTextOverlay(
             exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.TopStart)
         ) {
-            StyleChip(onClick = onOpenStyleSheet)
+            StyleChip(
+                onClick = onOpenStyleSheet,
+                modifier = Modifier.offset(x = 2.dp, y = 2.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun ResizeHandle(onDrag: (Offset) -> Unit) {
+private fun ResizeHandle(onDrag: (Offset) -> Unit, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
-            .offset(x = 18.dp, y = 18.dp)
+        modifier = modifier
             .size(36.dp)
             .clip(CircleShape)
             .background(Plasma500)
@@ -296,14 +317,14 @@ private fun ResizeHandle(onDrag: (Offset) -> Unit) {
 }
 
 @Composable
-private fun DeleteChip(onClick: () -> Unit) {
+private fun DeleteChip(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
         color = Space600,
         contentColor = Red500,
         border = BorderStroke(1.dp, Space500),
-        modifier = Modifier.offset(x = 18.dp, y = (-18).dp)
+        modifier = modifier
     ) {
         Box(
             modifier = Modifier.size(32.dp),
@@ -319,14 +340,14 @@ private fun DeleteChip(onClick: () -> Unit) {
 }
 
 @Composable
-private fun StyleChip(onClick: () -> Unit) {
+private fun StyleChip(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
         color = Space600,
         contentColor = Plasma500,
         border = BorderStroke(1.dp, Space500),
-        modifier = Modifier.offset(x = (-18).dp, y = (-18).dp)
+        modifier = modifier
     ) {
         Box(
             modifier = Modifier.size(32.dp),
