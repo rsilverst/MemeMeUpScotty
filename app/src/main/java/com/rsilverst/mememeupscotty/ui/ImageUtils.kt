@@ -13,6 +13,7 @@ import androidx.core.content.FileProvider
 import com.rsilverst.mememeupscotty.R
 import java.io.File
 import java.io.FileOutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -136,6 +137,7 @@ suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
         }
         Result.success(Unit)
     } catch (e: Exception) {
+        if (e is CancellationException) throw e
         Log.w(TAG, "shareBitmap failed", e)
         Result.failure(e)
     }
