@@ -122,7 +122,7 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
             if (!response.isSuccessful) {
                 throw Exception("Failed to download image: HTTP ${response.code}")
             }
-            val body = response.body ?: throw Exception("Image response had no body")
+            val body = response.body
             body.byteStream().use { input ->
                 target.outputStream().use { output -> input.copyTo(output) }
             }

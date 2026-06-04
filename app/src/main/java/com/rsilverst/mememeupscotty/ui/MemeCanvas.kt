@@ -109,6 +109,9 @@ internal fun MemeCanvas(
     var bottomOffset by remember { mutableStateOf(Offset.Zero) }
     var topSize by remember { mutableStateOf<Size?>(null) }
     var bottomSize by remember { mutableStateOf<Size?>(null) }
+    var topStyle by remember { mutableStateOf(CaptionStyle()) }
+    var bottomStyle by remember { mutableStateOf(CaptionStyle()) }
+    var styleSheetTarget by remember { mutableStateOf<CaptionTarget?>(null) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val showControls = !capturing
 
@@ -180,6 +183,7 @@ internal fun MemeCanvas(
                     onOffsetChange = { topOffset = it },
                     size = topSize,
                     onSizeChange = { topSize = it },
+                    style = topStyle,
                     capturing = capturing,
                     parentSize = canvasSize,
                     onDelete = {
@@ -194,6 +198,7 @@ internal fun MemeCanvas(
                             topSize = restoreSize
                         }
                     },
+                    onOpenStyleSheet = { styleSheetTarget = CaptionTarget.TOP },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 16.dp, start = 16.dp, end = 16.dp)
@@ -217,6 +222,7 @@ internal fun MemeCanvas(
                     onOffsetChange = { bottomOffset = it },
                     size = bottomSize,
                     onSizeChange = { bottomSize = it },
+                    style = bottomStyle,
                     capturing = capturing,
                     parentSize = canvasSize,
                     onDelete = {
@@ -231,6 +237,7 @@ internal fun MemeCanvas(
                             bottomSize = restoreSize
                         }
                     },
+                    onOpenStyleSheet = { styleSheetTarget = CaptionTarget.BOTTOM },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
@@ -246,7 +253,23 @@ internal fun MemeCanvas(
             }
         }
     }
+
+    when (styleSheetTarget) {
+        CaptionTarget.TOP -> CaptionStyleSheet(
+            style = topStyle,
+            onStyleChange = { topStyle = it },
+            onDismiss = { styleSheetTarget = null }
+        )
+        CaptionTarget.BOTTOM -> CaptionStyleSheet(
+            style = bottomStyle,
+            onStyleChange = { bottomStyle = it },
+            onDismiss = { styleSheetTarget = null }
+        )
+        null -> Unit
+    }
 }
+
+private enum class CaptionTarget { TOP, BOTTOM }
 
 // ============================================================================
 // Canvas states

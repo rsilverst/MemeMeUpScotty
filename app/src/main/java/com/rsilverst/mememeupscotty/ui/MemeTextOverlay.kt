@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.outlined.FormatColorText
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -67,7 +68,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rsilverst.mememeupscotty.R
-import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Plasma700
@@ -92,13 +92,18 @@ internal fun MemeTextOverlay(
     onOffsetChange: (Offset) -> Unit,
     size: Size?,
     onSizeChange: (Size) -> Unit,
+    style: CaptionStyle,
     capturing: Boolean,
     parentSize: IntSize,
     onDelete: () -> Unit,
+    onOpenStyleSheet: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val memeFont = MemeCaptionFontFamily
+    val fontFamily = style.font.fontFamily
+    val fontWeight = style.font.fontWeight
+    val fillColor = style.fill.color
+    val textAlign = style.alignment.textAlign
     val textMeasurer = rememberTextMeasurer()
     val minWidthPx = with(density) { 60.dp.toPx() }
     val minHeightPx = with(density) { 40.dp.toPx() }
@@ -175,21 +180,21 @@ internal fun MemeTextOverlay(
             val maxHeightPx = size?.height?.toInt()
                 ?: with(density) { 96.dp.toPx() }.toInt()
             val displayText = value.ifEmpty { placeholder }
-            val fontSize = remember(displayText, maxWidthPx, maxHeightPx) {
-                findBestFitFontSize(displayText, textMeasurer, memeFont, maxWidthPx, maxHeightPx)
+            val fontSize = remember(displayText, maxWidthPx, maxHeightPx, fontFamily, fontWeight) {
+                findBestFitFontSize(displayText, textMeasurer, fontFamily, fontWeight, maxWidthPx, maxHeightPx)
             }
             val strokeWidthPx = with(density) { (fontSize.value * 0.15f).sp.toPx() }
             val baseStyle = TextStyle(
                 fontSize = fontSize,
-                fontWeight = FontWeight.Black,
-                fontFamily = memeFont,
-                textAlign = TextAlign.Center
+                fontWeight = fontWeight,
+                fontFamily = fontFamily,
+                textAlign = textAlign
             )
 
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                textStyle = baseStyle.copy(color = Color.White),
+                textStyle = baseStyle.copy(color = fillColor),
                 cursorBrush = SolidColor(Plasma500),
                 modifier = Modifier
                     .focusRequester(focusRequester)
@@ -197,7 +202,7 @@ internal fun MemeTextOverlay(
                 decorationBox = { innerTextField ->
                     Box(contentAlignment = Alignment.Center) {
                         when {
-                            value.isNotEmpty() -> {
+                            value.isNotEmpty() && style.outline -> {
                                 Text(
                                     text = value,
                                     style = baseStyle.copy(
@@ -209,11 +214,11 @@ internal fun MemeTextOverlay(
                                     )
                                 )
                             }
-                            !capturing -> {
+                            value.isEmpty() && !capturing -> {
                                 Text(
                                     text = placeholder,
                                     style = baseStyle.copy(
-                                        color = Color.White.copy(alpha = if (hasFocus) 0.55f else 0.30f)
+                                        color = fillColor.copy(alpha = if (hasFocus) 0.55f else 0.30f)
                                     )
                                 )
                             }
@@ -251,6 +256,15 @@ internal fun MemeTextOverlay(
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
             DeleteChip(onClick = onDelete)
+        }
+
+        AnimatedVisibility(
+            visible = showChrome,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            StyleChip(onClick = onOpenStyleSheet)
         }
     }
 }
@@ -305,6 +319,29 @@ private fun DeleteChip(onClick: () -> Unit) {
 }
 
 @Composable
+private fun StyleChip(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = Space600,
+        contentColor = Plasma500,
+        border = BorderStroke(1.dp, Space500),
+        modifier = Modifier.offset(x = (-18).dp, y = (-18).dp)
+    ) {
+        Box(
+            modifier = Modifier.size(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.FormatColorText,
+                contentDescription = stringResource(R.string.edit_caption_style),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
 internal fun AddTextPill(
     onClick: () -> Unit,
     label: String,
@@ -345,6 +382,7 @@ private fun findBestFitFontSize(
     text: String,
     textMeasurer: TextMeasurer,
     fontFamily: FontFamily,
+    fontWeight: FontWeight,
     maxWidthPx: Int,
     maxHeightPx: Int
 ): TextUnit {
@@ -356,7 +394,7 @@ private fun findBestFitFontSize(
             style = TextStyle(
                 fontSize = sp.sp,
                 fontFamily = fontFamily,
-                fontWeight = FontWeight.Black,
+                fontWeight = fontWeight,
                 textAlign = TextAlign.Center
             ),
             constraints = widthConstraints

@@ -71,6 +71,24 @@
     <string name="use_photo">Use a photo</string>
     <string name="load_image_failed">Couldn\'t load that image.</string>
 
+    <!-- Caption styling -->
+    <string name="edit_caption_style">Edit caption style</string>
+    <string name="caption_style_title">Caption style</string>
+    <string name="caption_style_font">Font</string>
+    <string name="caption_style_color">Color</string>
+    <string name="caption_style_align">Align</string>
+    <string name="caption_style_outline">Outline</string>
+    <string name="caption_font_impact">Impact</string>
+    <string name="caption_font_sans">Sans</string>
+    <string name="caption_font_serif">Serif</string>
+    <string name="caption_color_white">White</string>
+    <string name="caption_color_yellow">Yellow</string>
+    <string name="caption_color_black">Black</string>
+    <string name="caption_color_red">Red</string>
+    <string name="caption_align_left">Align left</string>
+    <string name="caption_align_center">Align center</string>
+    <string name="caption_align_right">Align right</string>
+
     <!-- Model picker -->
     <string name="choose_engine">Choose engine</string>
     <string name="model_active">Active</string>

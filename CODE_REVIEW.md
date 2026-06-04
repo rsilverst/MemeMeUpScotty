@@ -21,6 +21,10 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **PR 7** | C1, C2, D3, D4 | 2026-06-01 | Capture correctness + undo for caption delete. **C1 + D4**: `captureCleanBitmap()` in `MemeScreen.kt` no longer waits a flat 2 frames before snapshotting — it now `delay(200)`s, which covers the 160ms fadeOut tween on the resize handle / delete chip's `AnimatedVisibility` exit transitions plus a small buffer. The saved bitmap no longer catches mid-fade chrome. Named constant `CAPTURE_CHROME_FADE_BUFFER_MS = 200L` with a comment pointing at the source-of-truth tween duration in `MemeTextOverlay.kt`. **C2**: `MemeCanvas.kt`'s `drawWithContent` block now branches on `capturing`: `if (capturing) { graphicsLayer.record { drawContent() } ; drawLayer(graphicsLayer) } else { drawContent() }`. The canvas no longer pays the layer-record cost on every recomposition during normal use; the layer is populated by the first frame after `capturing` flips true, which the 200ms delay then waits past. **D3**: deleting a caption no longer silently wipes the offset / size. Each `onDelete` lambda in `MemeCanvas` snapshots `(offset, size)` before clearing, then calls the new `onCaptionDeleted: (onUndo: () -> Unit) -> Unit` callback. `MemeContent` provides that callback: shows a `SnackbarDuration.Short` snackbar reading "Text box removed." with an "Undo" action that fires the restore lambda. The caption text itself is preserved by the existing `topText`/`bottomText` state in `MemeContent` (delete only affects visibility + transform), so undo restores everything. New strings: `caption_removed`, `undo`. `onCaptionDeleted` plumbed through `CompactLayout` and `ExpandedLayout`. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 | **PR 8** | C5, C6, C8 | 2026-06-01 | Inputs, drag bounds, and edge-to-edge insets. **C5**: `Dock`'s outer Column in `MemeControls.kt` now applies `windowInsetsPadding(WindowInsets.navigationBars)` so the Save/Share row doesn't sit under the 3-button nav bar in edge-to-edge mode. Kept on `Dock` itself (only `CompactLayout` calls it; tablet layout unaffected). **C6**: `PromptInput` gained an optional `onSubmit` parameter; the underlying `BasicTextField` now has `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go)` and `keyboardActions = KeyboardActions(onGo = { onSubmit?.invoke() })`. Both call sites — `Dock` in `CompactLayout`, the right-column input in `ExpandedLayout` — pass `onSubmit = onEnergize`. The existing `onEnergize` lambda already clears focus and early-returns on a blank prompt, so the Go key reuses the same code path. Captions intentionally left without an IME action (Enter means newline there). **C8**: `MemeCanvas` now tracks its rendered size with `onSizeChanged` and threads `parentSize: IntSize` to each `MemeTextOverlay`. The overlay tracks its own `positionInParent` via `onGloballyPositioned { coords -> positionInParent = coords.boundsInParent().topLeft }` and clamps drag by deriving the alignment anchor (`positionInParent - currentOffset`), clamping the desired absolute position to canvas bounds, then re-deriving the offset that would land there. Resize is also capped at parent dimensions so the handle can't grow the overlay past the canvas. Note: started with `coords.positionInParent()` per the original review sketch, but that extension wasn't resolving in Compose BoM 2026.05.01 even with the import; `boundsInParent().topLeft` is stable and gives the same value. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
 | **PR 9** | E1 | 2026-06-03 | Pick-from-gallery as a first-class image source alongside AI generation. **Wiring**: `ImageUtils.kt` gained `copyUriToCache(context, uri, cacheDir): Result<File>` that streams a content URI into a `gallery_meme_*.img` cache file off-main. `MainViewModel.kt` gained `setLoadedImage(file: File)` — a thin setter that deletes the previously-tracked file, updates `lastGeneratedFile`, and flips state to `GenerationState.Success(file)`. The VM does not own the URI copy (no Context dependency); `MemeScreen` does the copy in a `coroutineScope.launch { … }` block and either calls `setLoadedImage` on success or shows a `load_image_failed` snackbar on failure. `MainActivity.onCreate` cache cleanup was widened from just `generated_meme_*` to also include `gallery_meme_*` and `shared_meme_*` (closes a sub-piece of C11 as a side effect). **UI**: uses `ActivityResultContracts.PickVisualMedia()` (system Photo Picker — no runtime permission, available on all supported API levels via the back-port). Two entry points: (a) a muted "Use a photo" pill on the empty state, sitting below the prompt chips as a visual alternative (transparent fill + plain border vs. the colored prompt chips, so it reads as a secondary action without competing); (b) a 32dp icon chip in the canvas top-right that swaps the current image — only rendered when `generationState is Success && showControls`, wrapped in `AnimatedVisibility(fadeIn/fadeOut tween 160)` to match the existing caption chrome and stay clean during capture. Both routes plumb a single `onPickImage` callback through `CompactLayout` / `ExpandedLayout` → `MemeCanvas`. Gallery-picked images land in the same `GenerationState.Success(File)` so capture, save, share, and caption overlays just work. Did not implement E3 (aspect ratios) — explicitly deferred. `assembleDebug`, `assembleRelease`, `testDebugUnitTest` all green. |
+| **OOB — Release signing** | (release prep, not in review) | 2026-06-01 | Wires release `signingConfig` from four `local.properties` entries (`RELEASE_KEYSTORE_FILE`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`). When any property is missing, the `signingConfigs` block isn't created and the release variant stays unsigned, so fresh checkouts and CI without a keystore still build. `.gitignore` broadened to ignore the whole `.claude/` directory plus `*.jks` / `*.keystore` patterns. Not strictly a review item but enables a real distributable APK once A1 / A6 are addressed. Commit `22cef38`. |
+| **OOB — Compact layout rebuild** | D1, IME keyboard fix | 2026-06-01 | The bottom-stacked prompt input collided with the soft keyboard on phones. Rebuilt `CompactLayout` so all inputs sit above the canvas (Prompt → HUD → Energize → Canvas → Save/Share row). Caption editing on the canvas now works under the keyboard because the scroll viewport shrinks by the IME inset; `imePadding()` on the scrolling Column lets default bring-into-view scroll the focused caption above the keyboard. **D1 (tap-outside-to-dismiss)**: a `pointerInput` tap handler on the scrolling Column calls `focusManager.clearFocus()` when the user taps empty space; taps on `BasicTextField`s are consumed by the field, so the outer handler only fires for empty-area taps. Dropped the now-unused `Dock` composable (and its two previews) since the compact layout inlines those pieces directly; the expanded tablet layout already inlined them and is unchanged. Commit `ba753fe`. |
+| **OOB — Visual polish** | D11 | 2026-06-03 | **D11 (background gradient is almost flat)**: replaced the 3-stop `Space900 → 0xFF0D1128 → Space900` gradient with a 4-stop nebula gradient using deep indigo, warm magenta, and cold teal, so the "deep space" intent reads at typical viewport sizes. Also color-coded the three idle-state suggested-prompt chips: `PromptChip` refactored to accept `borderColor` / `textColor` / `backgroundColor`, and the chips now use `Plasma500` (blue), the new `Photon500` (purple), and `Solar500` (gold) derived with varying alpha. Copy edits: "Try one of these" → "Or try one of these", "Energize Again" → "Re-energize". Does not change D5 (chips still fill the prompt rather than auto-generating). Commit `fad071f`. |
+| **PR 10** | E4 | 2026-06-03 | Per-caption text styling. **Data model**: new `ui/CaptionStyle.kt` with a `CaptionStyle` data class and three enums — `CaptionFont` (`IMPACT` = Anton + Black, `BOLD_SANS` = Inter + Bold, `SERIF` = system Serif + Bold), `CaptionFill` (`WHITE`, `YELLOW = #FFD53D`, `BLACK`, `RED = #E74C4C`), `CaptionAlign` (`LEFT`/`CENTER`/`RIGHT` → `TextAlign.Start`/`Center`/`End`). Defaults (IMPACT + WHITE + CENTER + outline-on) replicate the prior hardcoded rendering byte-for-byte so existing captions look unchanged. **Overlay**: `MemeTextOverlay` gained `style: CaptionStyle` and `onOpenStyleSheet: () -> Unit` params. Hardcoded `MemeCaptionFontFamily` / `FontWeight.Black` / `Color.White` / `TextAlign.Center` are gone — every value reads from `style`. The stroke pass is now gated on `style.outline`; the placeholder uses `fillColor.copy(alpha = …)` instead of always-white. `findBestFitFontSize` threads `fontWeight` through so non-Black weights measure honestly. New `StyleChip` (`Icons.Outlined.FormatColorText`, Plasma500 tint, Space600 fill, matching DeleteChip's visual idiom) sits at `Alignment.TopStart` inside the chrome's `AnimatedVisibility(fadeIn/fadeOut tween 160)` block — visible on focus, fades out for capture so it never bakes into the saved bitmap. **Sheet**: new `ui/CaptionStyleSheet.kt`, modeled on `ModelPickerSheet` (`ModalBottomSheet`, `skipPartiallyExpanded = true`, Space700 container, Space900 scrim 0.65α, 40×4dp Space500 drag handle). Four sections: font row (3 swatches rendered in their own typeface), color row (4 circular swatches, checkmark on selected with inverted tint for white/yellow), alignment row (3 icon buttons using `FormatAlignLeft/Center/Right`), outline `Switch`. `onStyleChange` fires on every interaction so the underlying caption updates live — the user sees their pick reflect immediately and dismisses when satisfied. **Wiring**: `MemeCanvas` now owns `topStyle` / `bottomStyle` (each a `CaptionStyle()`) plus a private `CaptionTarget? { TOP, BOTTOM }` for which caption the sheet is editing. Top and bottom captions style independently; opening the sheet from one caption never affects the other. The sheet is mounted at the function root (sibling of the canvas Box) keyed on the target, so the popup-window-based sheet doesn't fight the canvas's clip-RoundedCornerShape. **Strings**: 16 new resources (sheet title, four section labels, three font names, four color names, three alignment a11y labels, chip content description). Skipped E2 (multi-text-box) at user request — top + bottom keep their roles. Build verified inside Android Studio (CLI build is blocked at the gradle script layer by an in-flight AGP/Gradle interaction unrelated to this change). |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
 
@@ -324,8 +328,10 @@ The shimmer animates but doesn't communicate progress. SDXL Lightning often retu
 
 The Stardate design language is genuinely strong — consistent palette, fonts (Inter / Space Grotesk / Anton is a smart triple), the TransporterPad illustration, the "Energize" CTA, and the themed error titles. Top marks for personality and visual coherence. Flagged items are interaction friction, not visual quality.
 
-### D1. No "tap outside to dismiss keyboard" [P2]
+### D1. No "tap outside to dismiss keyboard" [P2] ✅ **DONE (OOB compact-layout rebuild, 2026-06-01)**
 Compact layout has a scrollable column but no outer `clickable` to clear focus. Users tap empty canvas margins expecting dismissal.
+
+**Implementation note:** the compact-layout rebuild added a `pointerInput` tap handler on the scrolling Column that calls `focusManager.clearFocus()` on empty-space taps. Taps on `BasicTextField`s are consumed by the field, so the outer handler only fires for non-text-field taps. Commit `ba753fe`.
 
 ### D2. Disabled Save/Share has no tooltip [P3]
 When `generationState` is not Success, the buttons are visibly dim but the user has no inline explanation. The snackbar fallback ("Nothing to save yet.") only fires on click. Consider an inline helper text.
@@ -357,8 +363,10 @@ Re-roll changes seed and regenerates. There's no toast/feedback indicating "new 
 ### D10. TopAppBar has no leading icon / branding mark [P3]
 The launcher icon is a strong cyan mark — echoing it in the top bar would tie identity end-to-end.
 
-### D11. Background gradient is almost flat [P3]
+### D11. Background gradient is almost flat [P3] ✅ **DONE (OOB visual polish, 2026-06-03)**
 `Space900 → 0xFF0D1128 → Space900` are visually identical at most viewport sizes. The "deep space" intent is invisible. Either widen the gradient or replace with subtle starfield (cheap with a low-density Canvas).
+
+**Implementation note:** went with the widened-gradient option — 4-stop nebula gradient using deep indigo, warm magenta, and cold teal. New `Photon500` theme color introduced; also color-coded the suggested-prompt chips (`Plasma500` / `Photon500` / `Solar500`) for added vibrancy. Commit `fad071f`.
 
 ### D12. App title in TopAppBar can wrap [P3]
 "MEME ME UP SCOTTY" with `letterSpacing = 3.sp` is long on a 360dp phone. Verify on small devices; consider a shorter brand mark.
@@ -386,8 +394,10 @@ The stroke is `fontSize * 0.15f`, which gets very thin at small font sizes. On a
 ### D16. Dynamic font scaling untested [P2]
 `findBestFitFontSize` searches 14–40sp for canvas captions, but UI text uses fixed `sp` values that should scale with user font preferences. Test at 1.3× and 1.5× system font scale.
 
-### D17. Aspect ratio is locked to 1:1 [P1 — see also E1]
+### D17. Aspect ratio is locked to 1:1 [P1 — see also E1] 🚫 **DEPRIORITIZED — user request (2026-06-03)**
 `MemeCanvas` is `aspectRatio(1f)`. Many meme platforms (Instagram landscape, Reels/TikTok 9:16) need other ratios.
+
+**Implementation note:** same as E3 — user opted out. 1:1 is fine for the personal-use scope.
 
 ### D18. Materialize / loading animation polish [P3] ✅ **DONE (PR 5, 2026-05-29)** *(added 2026-05-29 from user testing)*
 **File:** `ui/MemeCanvas.kt::LoadingState`
@@ -426,16 +436,22 @@ Real memes are **mostly** template-based or photo-based. AI-generated source is 
 - Camera (P2)
 - Template library (P2 — a 10-template starter set goes a long way)
 
-### E2. Only 2 text boxes [P1]
+### E2. Only 2 text boxes [P1] 🚫 **DEPRIORITIZED — user request (2026-06-03)**
 Top + bottom only. Multi-panel memes (Drake, Distracted Boyfriend) need 3+. The overlay code is already generalized — extending to N is mostly removing the top/bottom binary.
 
 **Action:** Replace `topVisible/bottomVisible` with a `List<CaptionLayer>` in state.
 
-### E3. Square canvas locks out social use cases [P1]
+**Implementation note:** user explicitly asked to skip this for PR 10 ("for PR 10, skip E2, but do E4"). Top + bottom is fine for the personal-use scope. Revisit only if multi-panel templates show up as a need.
+
+### E3. Square canvas locks out social use cases [P1] 🚫 **DEPRIORITIZED — user request (2026-06-03)**
 See D17. Add 1:1, 4:5 (Instagram portrait), 9:16 (Reels/Stories), 16:9 (Twitter).
 
-### E4. No text styling [P1]
+**Implementation note:** user explicitly opted out when scoping PR 9 ("let's do E1. do not do E3"). 1:1 is fine for the personal-use scope. D17 is the same item from the UX side and should be treated as deprioritized alongside.
+
+### E4. No text styling [P1] ✅ **DONE (PR 10, 2026-06-03)**
 Color, font, alignment, stroke width, drop shadow, all hidden. Anton white+stroke is iconic but offering yellow Impact, no-stroke serif, and one or two alternate fonts is cheap and unlocks variety.
+
+**Implementation note:** per-caption styling via a new `CaptionStyle` data class — 3 fonts (Anton/Impact, Inter Bold, system Serif), 4 fills (white/yellow/black/red), 3 alignments, outline on/off. Style chip on the caption chrome (`Alignment.TopStart`, `Icons.Outlined.FormatColorText`) opens a `ModalBottomSheet` modeled on `ModelPickerSheet`. The sheet updates the underlying caption live so the user sees their picks reflect before dismiss. Top and bottom captions style independently. Defaults (Impact/white/centered/outline-on) preserve the original look. Stroke-width / drop-shadow not implemented in this PR — outline on/off is the toggle. See PR 10 row in the Status Log.
 
 ### E5. No generation history [P2]
 After Energize, the previous image is gone. Users frequently want "the second one was actually better."
@@ -561,7 +577,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | C10 | Permissions | — | Pre-Q permission path verified |
 | C11 | Correctness | P2 | `shared_meme_*` files leak |
 | C12 | UX | P2 | No loading progress |
-| D1 | UX | P2 | No tap-outside-to-dismiss |
+| D1 | UX | P2 | ✅ No tap-outside-to-dismiss *(OOB compact-layout rebuild, `pointerInput` + `clearFocus`)* |
 | D2 | UX | P3 | Disabled buttons silent |
 | D3 | UX | P1 | ✅ No undo for caption delete *(PR 7, "Undo" snackbar restores offset + size)* |
 | D4 | UX | P1 | ✅ Capture catches animating chrome *(PR 7, see C1)* |
@@ -571,21 +587,21 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | D8 | UX | P2 | Model switch has no signal |
 | D9 | UX | P2 | Re-roll has no feedback |
 | D10 | Visual | P3 | TopAppBar has no brand mark |
-| D11 | Visual | P3 | Background gradient is flat |
+| D11 | Visual | P3 | ✅ Background gradient is flat *(OOB visual polish, 4-stop nebula gradient + Photon500)* |
 | D12 | Visual | P3 | Title may wrap on small phones |
 | D13 | A11y | P2 | Touch targets below 48dp |
 | D14 | Visual | P2 | Caption stroke fails on light |
 | D15 | A11y | P2 | Semantics gaps |
 | D16 | A11y | P2 | Font scaling unverified |
-| D17 | UX | P1 | Aspect ratio locked to 1:1 |
+| D17 | UX | P1 | 🚫 Aspect ratio locked to 1:1 — deprioritized (personal-use scope) |
 | D18 | Visual | P3 | ✅ Materialize anim: faster scan lines + bolt pulses to yellow *(PR 5)* |
 | D19 | Visual | P3 | ✅ Canvas → HUD spacing tightness *(PR 5: 12 → 20dp)* |
 | D20 | UX | P2 | ✅ Prompt input `minLines = 3` *(PR 5)* |
 | D21 | Visual | P3 | ✅ Spacing scale unification *(PR 5)* |
 | E1 | Product | P1 | ✅ Image source picker *(PR 9, "Use a photo" empty-state pill + canvas swap chip via PickVisualMedia)* |
-| E2 | Product | P1 | Only 2 text boxes |
-| E3 | Product | P1 | Square-only canvas |
-| E4 | Product | P1 | No text styling |
+| E2 | Product | P1 | 🚫 Only 2 text boxes — deprioritized (personal-use scope) |
+| E3 | Product | P1 | 🚫 Square-only canvas — deprioritized (personal-use scope) |
+| E4 | Product | P1 | ✅ No text styling *(PR 10, per-caption font/color/alignment/outline via chrome chip → bottom sheet)* |
 | E5 | Product | P2 | No generation history |
 | E6 | Product | P2 | No prompt history |
 | E7 | Product | P2 | No draft persistence |
@@ -621,8 +637,11 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 6 — Typed errors:** B2, B5, C7. ✅ **landed 2026-05-30.** Sealed `GenerationOutcome` + `GenerationError`, Moshi error-body DTO, hardcoded English moved to resources.
 - **PR 7 — Capture correctness + UX polish:** C1, C2, D4, D3 (undo). ✅ **landed 2026-06-01.** `captureCleanBitmap()` now `delay(200)`s past the 160ms chrome fadeOut; `MemeCanvas`'s `drawWithContent` records only while `capturing`; caption delete shows an "Undo" snackbar that restores the pre-delete offset + size.
 - **PR 8 — Inputs, drag bounds, insets:** C5, C6, C8. ✅ **landed 2026-06-01.** Dock now lifts above the 3-button nav bar via `windowInsetsPadding(WindowInsets.navigationBars)`; the prompt input shows a "Go" IME action that fires Energize; caption drag clamps the rendered rect inside the canvas, and resize caps at parent dimensions.
-- **PR 9 — Product expansion vol. 1:** E1 (image source picker). ✅ **landed 2026-06-03.** E3 (aspect ratios) deferred at user request — gallery-picked images land in the existing `GenerationState.Success(File)` and the rest of the pipeline (capture / save / share / captions) just works.
-- **PR 10 — Product expansion vol. 2:** E2 (N text boxes), E4 (text styling). *(also E3 if not bundled elsewhere)*
+- **PR 9 — Product expansion vol. 1:** E1 (image source picker). ✅ **landed 2026-06-03.** E3 (aspect ratios) deprioritized at user request — gallery-picked images land in the existing `GenerationState.Success(File)` and the rest of the pipeline (capture / save / share / captions) just works.
+- **OOB — Release signing:** signingConfig wired from `local.properties`. ✅ **landed 2026-06-01.** Commit `22cef38`.
+- **OOB — Compact-layout rebuild + D1:** moved Prompt/HUD/Energize above the canvas to dodge the IME, added tap-outside-to-dismiss. ✅ **landed 2026-06-01.** Commit `ba753fe`. Closes D1.
+- **OOB — Visual polish:** D11 nebula gradient + color-coded prompt chips + Photon500 theme color + copy edits ("Re-energize"). ✅ **landed 2026-06-03.** Commit `fad071f`. Closes D11.
+- **PR 10 — Text styling:** E4. ✅ **landed 2026-06-03.** Per-caption font/color/alignment/outline via a `StyleChip` on the chrome → `CaptionStyleSheet` bottom sheet; live preview as the user picks. E2 (N text boxes) and E3 (aspect ratios) deprioritized at user request.
 - **PR 11 — Repo + UI tests:** F1, F2, F3, F4.
 - **PR 12 — Brand + legal:** A6, E13, E11.
 
