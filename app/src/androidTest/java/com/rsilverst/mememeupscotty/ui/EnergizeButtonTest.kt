@@ -2,7 +2,6 @@ package com.rsilverst.mememeupscotty.ui
 
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -42,18 +41,26 @@ class EnergizeButtonTest {
     }
 
     @Test
-    fun loadingState_showsEnergizingLabelAndIsDisabled() {
+    fun loadingState_showsCancelLabelAndInvokesOnCancel() {
+        var energizeClicks = 0
+        var cancelClicks = 0
         composeRule.setContent {
             MemeMeUpScottyTheme {
                 EnergizeButton(
                     generationState = GenerationState.Loading,
                     hasGeneratedImage = false,
-                    onClick = {}
+                    onClick = { energizeClicks++ },
+                    onCancel = { cancelClicks++ }
                 )
             }
         }
 
-        composeRule.onNodeWithText("ENERGIZING…").assertIsNotEnabled()
+        composeRule.onNodeWithText("CANCEL")
+            .assertIsEnabled()
+            .assertHasClickAction()
+            .performClick()
+        assertEquals(1, cancelClicks)
+        assertEquals(0, energizeClicks)
     }
 
     @Test

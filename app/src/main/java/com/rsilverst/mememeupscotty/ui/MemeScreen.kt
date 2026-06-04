@@ -292,6 +292,10 @@ private fun MemeContent(
         }
     }
 
+    val onCancel: () -> Unit = {
+        viewModel.cancelGeneration()
+    }
+
     val onPromptChipClick: (String) -> Unit = { suggestion ->
         prompt = suggestion
     }
@@ -335,6 +339,7 @@ private fun MemeContent(
             graphicsLayer = graphicsLayer,
             onOpenModelPicker = onOpenModelPicker,
             onEnergize = onEnergize,
+            onCancel = onCancel,
             onSave = onSaveAction,
             onShare = onShareAction,
             onPromptChip = onPromptChipClick,
@@ -357,6 +362,7 @@ private fun MemeContent(
             graphicsLayer = graphicsLayer,
             onOpenModelPicker = onOpenModelPicker,
             onEnergize = onEnergize,
+            onCancel = onCancel,
             onSave = onSaveAction,
             onShare = onShareAction,
             onPromptChip = onPromptChipClick,

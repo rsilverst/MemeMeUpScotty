@@ -54,6 +54,7 @@ internal fun CompactLayout(
     graphicsLayer: GraphicsLayer,
     onOpenModelPicker: () -> Unit,
     onEnergize: () -> Unit,
+    onCancel: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
     onPromptChip: (String) -> Unit,
@@ -100,7 +101,8 @@ internal fun CompactLayout(
         EnergizeButton(
             generationState = generationState,
             hasGeneratedImage = hasGeneratedImage,
-            onClick = onEnergize
+            onClick = onEnergize,
+            onCancel = onCancel
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -168,6 +170,7 @@ internal fun ExpandedLayout(
     graphicsLayer: GraphicsLayer,
     onOpenModelPicker: () -> Unit,
     onEnergize: () -> Unit,
+    onCancel: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
     onPromptChip: (String) -> Unit,
@@ -235,7 +238,8 @@ internal fun ExpandedLayout(
             EnergizeButton(
                 generationState = generationState,
                 hasGeneratedImage = hasGeneratedImage,
-                onClick = onEnergize
+                onClick = onEnergize,
+                onCancel = onCancel
             )
 
             val isLoading = generationState is GenerationState.Loading

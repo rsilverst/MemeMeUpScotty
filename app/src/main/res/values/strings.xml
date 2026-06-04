@@ -16,6 +16,7 @@
     <string name="regenerate">Re-energize</string>
     <string name="generating">Energizing&#8230;</string>
     <string name="materializing">Materializing</string>
+    <string name="cancel">Cancel</string>
 
     <!-- Secondary actions -->
     <string name="save">Save</string>

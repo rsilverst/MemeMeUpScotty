@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rsilverst.mememeupscotty.R
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
+import com.rsilverst.mememeupscotty.ui.theme.Red500
 import com.rsilverst.mememeupscotty.ui.theme.Space400
 import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space600
@@ -223,41 +225,42 @@ internal fun PromptInput(
 internal fun EnergizeButton(
     generationState: GenerationState,
     hasGeneratedImage: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCancel: () -> Unit = {}
 ) {
     val isLoading = generationState is GenerationState.Loading
     val label = when {
-        isLoading -> stringResource(R.string.generating)
+        isLoading -> stringResource(R.string.cancel)
         hasGeneratedImage || generationState is GenerationState.Success ->
             stringResource(R.string.regenerate)
         else -> stringResource(R.string.generate)
     }
+    // During Loading the button switches purpose to "cancel the in-flight
+    // generation". Keeps the same real estate, swaps icon + label + colors so
+    // the action is unmistakable. The canvas's MATERIALIZING animation +
+    // T+NS counter remains the "still working" signal.
     val containerColor = if (isLoading) Space600 else Plasma500
-    val contentColor = if (isLoading) Plasma500 else Space900
+    val contentColor = if (isLoading) Red500 else Space900
+    val icon = if (isLoading) Icons.Filled.Close else Icons.Filled.Bolt
 
     Button(
-        onClick = onClick,
-        enabled = !isLoading,
+        onClick = if (isLoading) onCancel else onClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(54.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
-            contentColor = contentColor,
-            disabledContainerColor = containerColor,
-            disabledContentColor = contentColor
+            contentColor = contentColor
         ),
         contentPadding = PaddingValues(horizontal = 16.dp)
     ) {
-        if (!isLoading) {
-            Icon(
-                imageVector = Icons.Filled.Bolt,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(10.dp))
         Text(
             text = label.uppercase(),
             style = MaterialTheme.typography.titleMedium.copy(

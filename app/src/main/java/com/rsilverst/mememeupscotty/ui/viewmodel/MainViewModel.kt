@@ -5,20 +5,24 @@ import androidx.lifecycle.viewModelScope
 import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 
-enum class ImageModel(val id: String, val label: String) {
-    JUGGERNAUT("sdxl-based/juggernaut-xl-lightning", "Juggernaut (general purpose)"),
-    STABILITY("stability-ai/sdxl", "Stability AI SDXL (best for celebrities)"),
-    REALVIS("adirik/realvisxl-v3.0-turbo", "RealVisXL (best for photorealism)"),
-    FLUX_SCHNELL("black-forest-labs/flux-schnell", "Flux Schnell (highest quality, no celebs)"),
-    DREAMSHAPER("lucataco/dreamshaper-xl-lightning", "DreamShaper XL (alternative realism)"),
-    BLUE_PENCIL("asiryan/blue-pencil-xl-v2", "Blue Pencil XL (anime / illustration)"),
-    PROTEUS("datacte/proteus-v0.5", "Proteus (painterly art)")
+// Display names live in res/values/strings.xml as model_*_name via the
+// ui.ImageModelMetadata extension props; the `id` is the Replicate path.
+enum class ImageModel(val id: String) {
+    JUGGERNAUT("sdxl-based/juggernaut-xl-lightning"),
+    STABILITY("stability-ai/sdxl"),
+    REALVIS("adirik/realvisxl-v3.0-turbo"),
+    FLUX_SCHNELL("black-forest-labs/flux-schnell"),
+    DREAMSHAPER("lucataco/dreamshaper-xl-lightning"),
+    BLUE_PENCIL("asiryan/blue-pencil-xl-v2"),
+    PROTEUS("datacte/proteus-v0.5")
 }
 
 sealed class GenerationState {
@@ -40,6 +44,11 @@ class MainViewModel(
 
     private var lastGeneratedFile: File? = null
 
+    // Tracks the in-flight generation coroutine so it can be cancelled —
+    // either by the user via cancelGeneration(), or implicitly by a fresh
+    // generateImage() call superseding the previous attempt.
+    private var generationJob: Job? = null
+
     fun selectModel(model: ImageModel) {
         _selectedModel.value = model
     }
@@ -60,26 +69,41 @@ class MainViewModel(
     }
 
     fun generateImage(prompt: String, cacheDir: File) {
-        viewModelScope.launch {
+        // Cancel any in-flight attempt so a rapid second tap (or a re-roll
+        // mid-generation) doesn't race with the previous one.
+        generationJob?.cancel()
+        generationJob = viewModelScope.launch {
             _generationState.value = GenerationState.Loading
-            val outcome = imageRepository.generateImage(_selectedModel.value.id, prompt, cacheDir)
-            _generationState.value = when (outcome) {
-                is GenerationOutcome.Success -> {
-                    lastGeneratedFile?.let { previousFile ->
-                        try {
-                            if (previousFile.exists()) {
-                                previousFile.delete()
+            try {
+                val outcome = imageRepository.generateImage(_selectedModel.value.id, prompt, cacheDir)
+                _generationState.value = when (outcome) {
+                    is GenerationOutcome.Success -> {
+                        lastGeneratedFile?.let { previousFile ->
+                            try {
+                                if (previousFile.exists()) {
+                                    previousFile.delete()
+                                }
+                            } catch (_: Exception) {
+                                // Suppress deletion errors
                             }
-                        } catch (_: Exception) {
-                            // Suppress deletion errors
                         }
+                        lastGeneratedFile = outcome.file
+                        GenerationState.Success(outcome.file)
                     }
-                    lastGeneratedFile = outcome.file
-                    GenerationState.Success(outcome.file)
+                    is GenerationOutcome.Failure -> GenerationState.Error(outcome.error)
                 }
-                is GenerationOutcome.Failure -> GenerationState.Error(outcome.error)
+            } catch (e: CancellationException) {
+                // Treat user-initiated cancellation as a return to Idle, not
+                // an error. Re-throw so the coroutine machinery still sees
+                // the cancellation cleanly.
+                _generationState.value = GenerationState.Idle
+                throw e
             }
         }
+    }
+
+    fun cancelGeneration() {
+        generationJob?.cancel()
     }
 
     override fun onCleared() {

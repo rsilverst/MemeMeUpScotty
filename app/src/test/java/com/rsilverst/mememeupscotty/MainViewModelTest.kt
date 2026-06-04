@@ -160,6 +160,26 @@ class MainViewModelTest {
     }
 
     @Test
+    fun cancelGeneration_duringLoading_returnsToIdle() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val viewModel = MainViewModel(mockRepository)
+        mockRepository.outcomeToReturn =
+            GenerationOutcome.Success(File("never_returned.img"))
+
+        viewModel.generateImage("prompt", File("dummy_cache"))
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(GenerationState.Loading, viewModel.generationState.value)
+
+        // User taps Cancel mid-flight. The repo gate is still closed, so the
+        // mock will never complete naturally; the cancel must be what drives
+        // the transition.
+        viewModel.cancelGeneration()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(GenerationState.Idle, viewModel.generationState.value)
+    }
+
+    @Test
     fun successfulGeneration_deletesPreviouslyTrackedFile() = runTest(testDispatcher) {
         val mockRepository = MockImageRepository()
         val viewModel = MainViewModel(mockRepository)
