@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meme Me Up Scotty — E5 Generation History Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+:root {
+  --space-900: #0B0E1F;
+  --space-800: #10142A;
+  --space-700: #151A33;
+  --space-600: #1E2542;
+  --space-500: #262C4A;
+  --space-400: #3A4170;
+  --plasma-300: #B8FEFF;
+  --plasma-500: #5DFCFF;
+  --plasma-700: #0FB6BC;
+  --photon-500: #FF4D8B;
+  --solar-500: #FFD166;
+  --red-500:    #FF6B6B;
+  --text-high: #F5F7FF;
+  --text-mid:  #B6BEDF;
+  --text-low:  #8B95C1;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-pill: 999px;
+
+  --ff-display: 'Space Grotesk', system-ui, sans-serif;
+  --ff-body:    'Inter', system-ui, sans-serif;
+  --ff-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --ff-caption: 'Anton', 'Impact', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--ff-body);
+  background:
+    linear-gradient(180deg,
+      var(--space-900) 0%,
+      #151233 25%,
+      #2E1135 55%,
+      #0C2436 80%,
+      var(--space-900) 100%);
+  color: var(--text-high);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  padding: 40px 20px;
+}
+
+h1.demo-title {
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 22px;
+  text-align: center;
+  margin: 0 0 8px;
+}
+.demo-sub {
+  text-align: center;
+  color: var(--text-low);
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  margin: 0 0 32px;
+  text-transform: uppercase;
+}
+
+.frames {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* ---------------------------------------------------------------------
+   Phone frame
+   --------------------------------------------------------------------- */
+.phone {
+  width: 380px;
+  background: transparent;
+  border-radius: 36px;
+  border: 1px solid var(--space-500);
+  overflow: hidden;
+  position: relative;
+}
+.phone-inner {
+  padding: 18px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.frame-label {
+  text-align: center;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--text-low);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* ---------------------------------------------------------------------
+   Top bar
+   --------------------------------------------------------------------- */
+.top-bar {
+  padding: 10px 4px;
+  text-align: center;
+}
+.top-bar .title {
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+}
+
+/* ---------------------------------------------------------------------
+   Prompt input
+   --------------------------------------------------------------------- */
+.prompt {
+  background: var(--space-700);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-family: var(--ff-body);
+  font-size: 14px;
+  color: var(--text-high);
+  min-height: 64px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.prompt .edit-icon {
+  color: var(--text-low);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ---------------------------------------------------------------------
+   HUD strip
+   --------------------------------------------------------------------- */
+.hud {
+  background: rgba(30, 37, 66, 0.6);
+  border: 1px solid var(--space-500);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hud .glyph {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: rgba(93, 252, 255, 0.12);
+  border: 1px solid rgba(93, 252, 255, 0.30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--plasma-500);
+}
+.hud .model-name {
+  font-family: var(--ff-body);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.hud .dot { color: var(--space-400); }
+.hud .tap-hint {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--text-low);
+  letter-spacing: 0.05em;
+}
+.hud .spacer { flex: 1; }
+.hud .reroll {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--space-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-mid);
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------------
+   Energize button
+   --------------------------------------------------------------------- */
+.energize {
+  background: var(--plasma-500);
+  color: var(--space-900);
+  border: none;
+  border-radius: var(--r-md);
+  height: 54px;
+  font-family: var(--ff-display);
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------
+   Canvas
+   --------------------------------------------------------------------- */
+.canvas {
+  aspect-ratio: 1;
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(circle at 30% 30%, #3a2a5c 0%, #1a1f3e 55%, #0f1024 100%);
+  border: 1px solid var(--space-500);
+  position: relative;
+  overflow: hidden;
+}
+.canvas .caption-top,
+.canvas .caption-bottom {
+  position: absolute;
+  left: 0; right: 0;
+  text-align: center;
+  font-family: var(--ff-caption);
+  font-weight: 900;
+  font-size: 32px;
+  color: white;
+  -webkit-text-stroke: 2px black;
+  paint-order: stroke fill;
+}
+.canvas .caption-top { top: 18px; }
+.canvas .caption-bottom { bottom: 18px; }
+
+/* The persistent "Use a photo" chip already lives top-right per PR 9 */
+.canvas .photo-chip {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(11, 14, 31, 0.72);
+  border: 1px solid rgba(93, 252, 255, 0.40);
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--ff-mono);
+  letter-spacing: 0.05em;
+  color: var(--text-high);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.canvas .photo-chip .icon { color: var(--plasma-500); }
+
+/* ---------------------------------------------------------------------
+   History strip (E5)
+   --------------------------------------------------------------------- */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.history-label {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--text-low);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.history-label .count {
+  color: var(--text-mid);
+  font-family: var(--ff-mono);
+}
+.history-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 2px 4px;
+}
+.history-strip::-webkit-scrollbar { display: none; }
+
+.thumb {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid var(--space-500);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.thumb.selected {
+  border: 2px solid var(--plasma-500);
+  box-shadow: 0 0 0 1px rgba(93, 252, 255, 0.20);
+}
+.thumb .num {
+  position: absolute;
+  top: 3px; left: 4px;
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  color: rgba(255,255,255,0.65);
+  letter-spacing: 0.05em;
+  background: rgba(11, 14, 31, 0.50);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* Distinct fake "generation" thumbnails so the strip reads as a real history */
+.thumb-1 { background: radial-gradient(circle at 30% 30%, #3a2a5c, #1a1f3e 55%, #0f1024); }
+.thumb-2 { background: radial-gradient(circle at 70% 30%, #5c2a3a, #3e1a2f 55%, #240f1c); }
+.thumb-3 { background: radial-gradient(circle at 50% 60%, #2a5c3a, #1a3e2f 55%, #0f241c); }
+.thumb-4 { background: radial-gradient(circle at 30% 70%, #5c4a2a, #3e2f1a, #24180f); }
+.thumb-5 { background: radial-gradient(circle at 70% 50%, #2a4a5c, #1a2f3e, #0f1c24); }
+.thumb-6 { background: radial-gradient(circle at 50% 30%, #5c2a4a, #3e1a2f 55%, #240f1f); }
+.thumb-7 { background: radial-gradient(circle at 30% 50%, #4a5c2a, #2f3e1a 55%, #1c240f); }
+.thumb-8 { background: radial-gradient(circle at 70% 70%, #2a3a5c, #1a253e 55%, #0f1424); }
+.thumb-9 { background: radial-gradient(circle at 50% 50%, #5c5c2a, #3e3e1a 55%, #24240f); }
+
+/* Fade the right edge of the strip so the "more available, scroll for it"
+   affordance is visible even when the user hasn't scrolled yet. */
+.history-strip-wrap {
+  position: relative;
+}
+.history-strip-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 4px; right: 0;
+  width: 32px;
+  pointer-events: none;
+  background: linear-gradient(to right, rgba(15, 16, 36, 0) 0%, var(--space-900) 100%);
+}
+
+/* ---------------------------------------------------------------------
+   Save / Share row
+   --------------------------------------------------------------------- */
+.ghost-row {
+  display: flex;
+  gap: 8px;
+}
+.ghost {
+  flex: 1;
+  height: 44px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--space-500);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--ff-body);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   Notes
+   --------------------------------------------------------------------- */
+.notes {
+  max-width: 380px;
+  margin: 32px auto 0;
+  color: var(--text-low);
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 16px 18px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--space-500);
+  background: rgba(21, 26, 51, 0.5);
+}
+.notes h3 {
+  margin: 0 0 8px;
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.notes ul { margin: 0; padding-left: 18px; }
+.notes li + li { margin-top: 6px; }
+.notes code {
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--plasma-500);
+}
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">E5 — Generation History</h1>
+<p class="demo-sub">Session-long horizontal carousel · cleared on app close</p>
+
+<div class="frames">
+
+  <!-- ============================================================ -->
+  <!-- Frame: Long session, most-recent selected, strip overflows   -->
+  <!-- ============================================================ -->
+  <div>
+    <div class="frame-label">Phone · long session, most-recent selected</div>
+    <div class="phone">
+      <div class="phone-inner">
+
+        <div class="top-bar">
+          <div class="title">MEME ME UP, SCOTTY</div>
+        </div>
+
+        <div class="prompt">
+          <span class="edit-icon">✎</span>
+          <span>a corgi as the captain</span>
+        </div>
+
+        <div class="hud">
+          <div class="glyph">J</div>
+          <div class="model-name">Juggernaut</div>
+          <div class="dot">·</div>
+          <div class="tap-hint">tap to change</div>
+          <div class="spacer"></div>
+          <div class="reroll">⟲</div>
+        </div>
+
+        <button class="energize">⚡ RE-ENERGIZE</button>
+
+        <div class="canvas">
+          <div class="caption-top">CAPTAIN'S LOG</div>
+          <div class="caption-bottom">STARDATE WOOF</div>
+          <div class="photo-chip">
+            <span class="icon">▣</span>
+            <span>Use a photo</span>
+          </div>
+        </div>
+
+        <!-- E5: session-long history strip -->
+        <div class="history">
+          <div class="history-label">
+            <span>This session</span>
+            <span class="count">· 9</span>
+          </div>
+          <div class="history-strip-wrap">
+            <div class="history-strip">
+              <div class="thumb thumb-4 selected"></div>
+              <div class="thumb thumb-3"></div>
+              <div class="thumb thumb-2"></div>
+              <div class="thumb thumb-1"></div>
+              <div class="thumb thumb-5"></div>
+              <div class="thumb thumb-6"></div>
+              <div class="thumb thumb-7"></div>
+              <div class="thumb thumb-8"></div>
+              <div class="thumb thumb-9"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ghost-row">
+          <div class="ghost">↓ SAVE</div>
+          <div class="ghost">↗ SHARE</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- Frame: Same session, scrolled into older history             -->
+  <!-- ============================================================ -->
+  <div>
+    <div class="frame-label">Phone · scrolled into older history</div>
+    <div class="phone">
+      <div class="phone-inner">
+
+        <div class="top-bar">
+          <div class="title">MEME ME UP, SCOTTY</div>
+        </div>
+
+        <div class="prompt">
+          <span class="edit-icon">✎</span>
+          <span>a corgi as the captain</span>
+        </div>
+
+        <div class="hud">
+          <div class="glyph">J</div>
+          <div class="model-name">Juggernaut</div>
+          <div class="dot">·</div>
+          <div class="tap-hint">tap to change</div>
+          <div class="spacer"></div>
+          <div class="reroll">⟲</div>
+        </div>
+
+        <button class="energize">⚡ RE-ENERGIZE</button>
+
+        <!-- Different canvas color = different image -->
+        <div class="canvas" style="background: radial-gradient(circle at 30% 50%, #4a5c2a, #2f3e1a 55%, #1c240f);">
+          <div class="caption-top">CAPTAIN'S LOG</div>
+          <div class="caption-bottom">STARDATE WOOF</div>
+          <div class="photo-chip">
+            <span class="icon">▣</span>
+            <span>Use a photo</span>
+          </div>
+        </div>
+
+        <div class="history">
+          <div class="history-label">
+            <span>This session</span>
+            <span class="count">· 9</span>
+          </div>
+          <!-- Manually offset to simulate the user scrolling right -->
+          <div class="history-strip-wrap">
+            <div class="history-strip" style="transform: translateX(-180px);">
+              <div class="thumb thumb-4"></div>
+              <div class="thumb thumb-3"></div>
+              <div class="thumb thumb-2"></div>
+              <div class="thumb thumb-1"></div>
+              <div class="thumb thumb-5"></div>
+              <div class="thumb thumb-6"></div>
+              <div class="thumb thumb-7 selected"></div>
+              <div class="thumb thumb-8"></div>
+              <div class="thumb thumb-9"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ghost-row">
+          <div class="ghost">↓ SAVE</div>
+          <div class="ghost">↗ SHARE</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <h3>Design choices baked in</h3>
+  <ul>
+    <li><b>Placement:</b> below the canvas, above Save/Share. Reads as "what came before this" with the canvas as the focal anchor.</li>
+    <li><b>Capacity:</b> unbounded for the live session. Every successful generation appends to the head of the carousel; older entries push to the right and remain reachable via horizontal scroll.</li>
+    <li><b>Order:</b> most-recent on the left. Just-generated lands right where your thumb already is after pressing Energize. Older entries reachable by scrolling right; the right-edge fade gradient announces "more available".</li>
+    <li><b>Selected:</b> 2dp Plasma500 border + faint outer glow. Unselected thumbs use the standard 1dp Space500.</li>
+    <li><b>Empty/single state:</b> hide the strip entirely until there are 2+ generations. No reason to show a strip-of-one.</li>
+    <li><b>Loading state:</b> strip stays visible (you can still browse history while a new gen is in flight). The freshly-generating attempt isn't added until it succeeds.</li>
+    <li><b>Tap behavior:</b> tap a thumb → it becomes the active canvas image (reuses the existing <code>setLoadedImage(file)</code> path from PR 9). Captions persist; offset / size / style on each caption persist too (those live in <code>MemeCanvas</code> state and aren't tied to the image).</li>
+    <li><b>Persistence:</b> in-memory only. App close clears the carousel; the existing <code>MainActivity.onCreate</code> cache sweep handles the on-disk side by deleting all <code>generated_meme_*</code> files at next launch.</li>
+    <li><b>File lifecycle during session:</b> nothing is deleted while the app is alive — every generation keeps its cache file so any thumb is one tap away from being the active canvas. Footprint is bounded by how long the user keeps the session open; a typical session is small enough that this is fine for a personal tool.</li>
+  </ul>
+</div>
+
+</body>
+</html>

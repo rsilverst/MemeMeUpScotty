@@ -12,7 +12,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -145,18 +144,40 @@ class MainViewModelTest {
     }
 
     @Test
-    fun setLoadedImage_deletesPreviouslyTrackedFile() {
+    fun setLoadedImage_appendsToHistoryAtHead_andDoesNotDeletePrevious() {
         val viewModel = MainViewModel(MockImageRepository())
         val first = File.createTempFile("vm-prev-", ".img").apply { deleteOnExit() }
         val second = File.createTempFile("vm-next-", ".img").apply { deleteOnExit() }
-        assertTrue(first.exists())
 
         viewModel.setLoadedImage(first)
         viewModel.setLoadedImage(second)
 
-        // First should be cleaned up; second is now the tracked image.
-        assertFalse("previous file should have been deleted", first.exists())
-        assertTrue("new file should still exist", second.exists())
+        // Both files survive the session — the carousel is unbounded; cleanup
+        // happens at cold start, not on swap.
+        assertTrue("first file should NOT have been deleted", first.exists())
+        assertTrue("second file should still exist", second.exists())
+
+        // Most-recent at index 0.
+        val history = viewModel.generationHistory.value
+        assertEquals(listOf(second, first), history)
+    }
+
+    @Test
+    fun selectFromHistory_flipsActiveButDoesNotMutateHistory() {
+        val viewModel = MainViewModel(MockImageRepository())
+        val first = File.createTempFile("vm-first-", ".img").apply { deleteOnExit() }
+        val second = File.createTempFile("vm-second-", ".img").apply { deleteOnExit() }
+
+        viewModel.setLoadedImage(first)
+        viewModel.setLoadedImage(second)
+        val historyBefore = viewModel.generationHistory.value
+
+        viewModel.selectFromHistory(first)
+
+        // Active state flipped to the older entry; history is unchanged.
+        val state = viewModel.generationState.value as GenerationState.Success
+        assertEquals(first, state.imageFile)
+        assertEquals(historyBefore, viewModel.generationHistory.value)
     }
 
     @Test
@@ -180,16 +201,16 @@ class MainViewModelTest {
     }
 
     @Test
-    fun successfulGeneration_deletesPreviouslyTrackedFile() = runTest(testDispatcher) {
+    fun successfulGeneration_prependsToHistory_andKeepsPriorEntries() = runTest(testDispatcher) {
         val mockRepository = MockImageRepository()
         val viewModel = MainViewModel(mockRepository)
         val cacheDir = File("dummy_cache")
         val first = File.createTempFile("gen-prev-", ".img").apply { deleteOnExit() }
 
-        // Seed the VM with a tracked file via setLoadedImage, then run a
-        // successful generation and confirm the prior file is cleaned up.
+        // Seed with one history entry via setLoadedImage, then run a
+        // successful generation. The new file should land at index 0 and
+        // the prior entry should remain in the carousel (and on disk).
         viewModel.setLoadedImage(first)
-        assertTrue(first.exists())
 
         val second = File.createTempFile("gen-next-", ".img").apply { deleteOnExit() }
         mockRepository.outcomeToReturn = GenerationOutcome.Success(second)
@@ -198,8 +219,9 @@ class MainViewModelTest {
         mockRepository.gate.complete(Unit)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertFalse("previous tracked file should have been deleted", first.exists())
+        assertTrue("previously loaded file should still be on disk", first.exists())
         val state = viewModel.generationState.value as GenerationState.Success
         assertEquals(second, state.imageFile)
+        assertEquals(listOf(second, first), viewModel.generationHistory.value)
     }
 }

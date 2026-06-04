@@ -42,7 +42,11 @@ class MainViewModel(
     private val _selectedModel = MutableStateFlow(ImageModel.JUGGERNAUT)
     val selectedModel: StateFlow<ImageModel> = _selectedModel.asStateFlow()
 
-    private var lastGeneratedFile: File? = null
+    // Session-long carousel of every image the user has loaded onto the canvas
+    // (generated or gallery-picked). Most-recent at index 0. In-memory only;
+    // the on-disk files are swept on cold start by MainActivity.onCreate.
+    private val _generationHistory = MutableStateFlow<List<File>>(emptyList())
+    val generationHistory: StateFlow<List<File>> = _generationHistory.asStateFlow()
 
     // Tracks the in-flight generation coroutine so it can be cancelled —
     // either by the user via cancelGeneration(), or implicitly by a fresh
@@ -54,17 +58,15 @@ class MainViewModel(
     }
 
     // Swap the canvas image to one the caller has already materialised on
-    // disk (e.g. a copy of a gallery URI). The previous tracked file is
-    // deleted so cache doesn't accumulate.
+    // disk (e.g. a copy of a gallery URI) and add it to the history strip.
     fun setLoadedImage(file: File) {
-        lastGeneratedFile?.let { previous ->
-            try {
-                if (previous.exists()) previous.delete()
-            } catch (_: Exception) {
-                // Suppress deletion errors
-            }
-        }
-        lastGeneratedFile = file
+        appendToHistory(file)
+        _generationState.value = GenerationState.Success(file)
+    }
+
+    // User tapped a thumbnail in the history strip. Just flips active —
+    // doesn't re-add to history (the file is already there).
+    fun selectFromHistory(file: File) {
         _generationState.value = GenerationState.Success(file)
     }
 
@@ -78,16 +80,7 @@ class MainViewModel(
                 val outcome = imageRepository.generateImage(_selectedModel.value.id, prompt, cacheDir)
                 _generationState.value = when (outcome) {
                     is GenerationOutcome.Success -> {
-                        lastGeneratedFile?.let { previousFile ->
-                            try {
-                                if (previousFile.exists()) {
-                                    previousFile.delete()
-                                }
-                            } catch (_: Exception) {
-                                // Suppress deletion errors
-                            }
-                        }
-                        lastGeneratedFile = outcome.file
+                        appendToHistory(outcome.file)
                         GenerationState.Success(outcome.file)
                     }
                     is GenerationOutcome.Failure -> GenerationState.Error(outcome.error)
@@ -106,15 +99,11 @@ class MainViewModel(
         generationJob?.cancel()
     }
 
-    override fun onCleared() {
-        lastGeneratedFile?.let { file ->
-            try {
-                if (file.exists()) {
-                    file.delete()
-                }
-            } catch (_: Exception) {
-                // Suppress deletion errors
-            }
-        }
+    private fun appendToHistory(file: File) {
+        // Most-recent at index 0 so the strip's leftmost slot is always the
+        // newest. If the same file is somehow re-added (unlikely in normal
+        // flow, but defensive), drop the existing reference first to avoid
+        // duplicate entries.
+        _generationHistory.value = listOf(file) + _generationHistory.value.filter { it != file }
     }
 }

@@ -59,7 +59,10 @@ internal fun CompactLayout(
     onShare: () -> Unit,
     onPromptChip: (String) -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
-    onPickImage: () -> Unit
+    onPickImage: () -> Unit,
+    generationHistory: List<java.io.File>,
+    activeFile: java.io.File?,
+    onSelectFromHistory: (java.io.File) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     Column(
@@ -121,6 +124,15 @@ internal fun CompactLayout(
             onPickImage = onPickImage
         )
 
+        if (generationHistory.size >= 2) {
+            Spacer(modifier = Modifier.height(16.dp))
+            HistoryStrip(
+                history = generationHistory,
+                selectedFile = activeFile,
+                onSelect = onSelectFromHistory
+            )
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
 
         val isLoading = generationState is GenerationState.Loading
@@ -175,7 +187,10 @@ internal fun ExpandedLayout(
     onShare: () -> Unit,
     onPromptChip: (String) -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
-    onPickImage: () -> Unit
+    onPickImage: () -> Unit,
+    generationHistory: List<java.io.File>,
+    activeFile: java.io.File?,
+    onSelectFromHistory: (java.io.File) -> Unit
 ) {
     Row(
         modifier = modifier
@@ -209,6 +224,14 @@ internal fun ExpandedLayout(
                 onOpenModelPicker = onOpenModelPicker,
                 onReroll = onEnergize
             )
+            if (generationHistory.size >= 2) {
+                Spacer(Modifier.height(16.dp))
+                HistoryStrip(
+                    history = generationHistory,
+                    selectedFile = activeFile,
+                    onSelect = onSelectFromHistory
+                )
+            }
         }
 
         Column(

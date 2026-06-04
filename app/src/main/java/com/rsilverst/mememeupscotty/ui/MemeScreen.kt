@@ -74,6 +74,7 @@ fun MemeScreen(
 ) {
     val generationState by viewModel.generationState.collectAsState()
     val selectedModel by viewModel.selectedModel.collectAsState()
+    val generationHistory by viewModel.generationHistory.collectAsState()
     var hasGeneratedImage by remember { mutableStateOf(false) }
     var modelPickerOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -101,6 +102,7 @@ fun MemeScreen(
                 viewModel = viewModel,
                 generationState = generationState,
                 selectedModel = selectedModel,
+                generationHistory = generationHistory,
                 hasGeneratedImage = hasGeneratedImage,
                 snackbarHostState = snackbarHostState,
                 onOpenModelPicker = { modelPickerOpen = true }
@@ -182,6 +184,7 @@ private fun MemeContent(
     viewModel: MainViewModel,
     generationState: GenerationState,
     selectedModel: ImageModel,
+    generationHistory: List<java.io.File>,
     hasGeneratedImage: Boolean,
     snackbarHostState: SnackbarHostState,
     onOpenModelPicker: () -> Unit
@@ -296,6 +299,14 @@ private fun MemeContent(
         viewModel.cancelGeneration()
     }
 
+    val onSelectFromHistory: (java.io.File) -> Unit = { file ->
+        viewModel.selectFromHistory(file)
+    }
+
+    // The currently displayed image, used by the history strip to render
+    // the selected ring. Null in Idle/Loading/Error.
+    val activeFile: java.io.File? = (generationState as? GenerationState.Success)?.imageFile
+
     val onPromptChipClick: (String) -> Unit = { suggestion ->
         prompt = suggestion
     }
@@ -344,7 +355,10 @@ private fun MemeContent(
             onShare = onShareAction,
             onPromptChip = onPromptChipClick,
             onCaptionDeleted = onCaptionDeleted,
-            onPickImage = onPickImage
+            onPickImage = onPickImage,
+            generationHistory = generationHistory,
+            activeFile = activeFile,
+            onSelectFromHistory = onSelectFromHistory
         )
     } else {
         CompactLayout(
@@ -367,7 +381,10 @@ private fun MemeContent(
             onShare = onShareAction,
             onPromptChip = onPromptChipClick,
             onCaptionDeleted = onCaptionDeleted,
-            onPickImage = onPickImage
+            onPickImage = onPickImage,
+            generationHistory = generationHistory,
+            activeFile = activeFile,
+            onSelectFromHistory = onSelectFromHistory
         )
     }
 }

@@ -72,6 +72,10 @@
     <string name="use_photo">Use a photo</string>
     <string name="load_image_failed">Couldn\'t load that image.</string>
 
+    <!-- Generation history strip -->
+    <string name="history_label">This session</string>
+    <string name="history_thumb_content_description">Recent generation</string>
+
     <!-- Caption styling -->
     <string name="edit_caption_style">Edit caption style</string>
     <string name="caption_style_title">Caption style</string>
