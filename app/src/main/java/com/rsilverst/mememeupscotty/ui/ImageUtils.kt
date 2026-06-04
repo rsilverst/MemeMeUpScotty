@@ -18,16 +18,33 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "ImageUtils"
 
+// Lossless format pair used by both save and share. WEBP_LOSSLESS lands
+// in API 30 (Android 11); below that we fall back to PNG -- still lossless,
+// just larger -- because the older `WEBP` constant is lossy at every
+// quality level. WebP-lossless is ~25-30% smaller than PNG for typical
+// meme content while preserving the high-contrast caption strokes exactly.
+private data class OutputFormat(
+    val compress: Bitmap.CompressFormat,
+    val extension: String,
+    val mimeType: String
+)
+
+private val outputFormat: OutputFormat = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    OutputFormat(Bitmap.CompressFormat.WEBP_LOSSLESS, "webp", "image/webp")
+} else {
+    OutputFormat(Bitmap.CompressFormat.PNG, "png", "image/png")
+}
+
 suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> {
     val appContext = context.applicationContext
     return withContext(Dispatchers.IO) {
         try {
-            val filename = "meme_${System.currentTimeMillis()}.png"
+            val filename = "meme_${System.currentTimeMillis()}.${outputFormat.extension}"
             var fos: java.io.OutputStream? = null
             var imageUri: Uri? = null
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                put(MediaStore.MediaColumns.MIME_TYPE, outputFormat.mimeType)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/MemeMeUpScotty")
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
@@ -53,7 +70,7 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> 
             }
 
             fos.use {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                bitmap.compress(outputFormat.compress, 100, it)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -96,9 +113,9 @@ suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
         val uri = withContext(Dispatchers.IO) {
             val cachePath = File(appContext.cacheDir, "images")
             cachePath.mkdirs()
-            val file = File(cachePath, "shared_meme_${System.currentTimeMillis()}.png")
+            val file = File(cachePath, "shared_meme_${System.currentTimeMillis()}.${outputFormat.extension}")
             FileOutputStream(file).use { stream ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                bitmap.compress(outputFormat.compress, 100, stream)
             }
 
             FileProvider.getUriForFile(
@@ -110,7 +127,7 @@ suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
 
         withContext(Dispatchers.Main) {
             val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
+                type = outputFormat.mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
