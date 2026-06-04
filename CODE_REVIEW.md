@@ -24,6 +24,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **OOB — Release signing** | (release prep, not in review) | 2026-06-01 | Wires release `signingConfig` from four `local.properties` entries (`RELEASE_KEYSTORE_FILE`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`). When any property is missing, the `signingConfigs` block isn't created and the release variant stays unsigned, so fresh checkouts and CI without a keystore still build. `.gitignore` broadened to ignore the whole `.claude/` directory plus `*.jks` / `*.keystore` patterns. Not strictly a review item but enables a real distributable APK once A1 / A6 are addressed. Commit `22cef38`. |
 | **OOB — Compact layout rebuild** | D1, IME keyboard fix | 2026-06-01 | The bottom-stacked prompt input collided with the soft keyboard on phones. Rebuilt `CompactLayout` so all inputs sit above the canvas (Prompt → HUD → Energize → Canvas → Save/Share row). Caption editing on the canvas now works under the keyboard because the scroll viewport shrinks by the IME inset; `imePadding()` on the scrolling Column lets default bring-into-view scroll the focused caption above the keyboard. **D1 (tap-outside-to-dismiss)**: a `pointerInput` tap handler on the scrolling Column calls `focusManager.clearFocus()` when the user taps empty space; taps on `BasicTextField`s are consumed by the field, so the outer handler only fires for empty-area taps. Dropped the now-unused `Dock` composable (and its two previews) since the compact layout inlines those pieces directly; the expanded tablet layout already inlined them and is unchanged. Commit `ba753fe`. |
 | **OOB — Visual polish** | D11 | 2026-06-03 | **D11 (background gradient is almost flat)**: replaced the 3-stop `Space900 → 0xFF0D1128 → Space900` gradient with a 4-stop nebula gradient using deep indigo, warm magenta, and cold teal, so the "deep space" intent reads at typical viewport sizes. Also color-coded the three idle-state suggested-prompt chips: `PromptChip` refactored to accept `borderColor` / `textColor` / `backgroundColor`, and the chips now use `Plasma500` (blue), the new `Photon500` (purple), and `Solar500` (gold) derived with varying alpha. Copy edits: "Try one of these" → "Or try one of these", "Energize Again" → "Re-energize". Does not change D5 (chips still fill the prompt rather than auto-generating). Commit `fad071f`. |
+| **PR 11** | F1, F2 (partial), F3 (seed), F4 | 2026-06-04 | Test surface buildout. **F1**: new `ReplicateImageRepositoryTest` with a small file-private `FakeReplicateApi` and Retrofit `Response.success` / `Response.error` stubs (no MockWebServer dependency). 14 tests cover: invalid model id (no `/`); 401/402/404/429-with-retry-after/429-without/503 → typed `AuthRejected`/`OutOfCredit`/`ModelUnavailable`/`RateLimited(seconds)`/`RateLimited(null)`/`Server(503)`; model returned with `latest_version = null` → `Unexpected("no published version")`; `createPrediction` 402 → `OutOfCredit` (smoke-test that error mapping runs on the second API call too); poll terminal `status = "failed"` with error message → `Unexpected(error)`; poll terminal `status = "canceled"` → `Unexpected("...canceled")`; poll terminal `status = "succeeded"` with `output = null` → `Unexpected("no image")`; getPrediction HTTP failure mid-poll → `Timeout` (pinned to document current "null from poll = Timeout" semantics so a deliberate semantic change has a failing test); thrown `RuntimeException` from getModel → `Unexpected(message)`. Skipped: full happy-path download (needs MockWebServer for the `replicate.delivery` URL fetch) and wall-clock-driven 120s timeout (`System.currentTimeMillis` is real time, not virtual). **F2**: extended `MainViewModelTest` with `selectModel` updates the flow; `setLoadedImage` flips state to `Success`; `setLoadedImage` deletes the previously tracked file (real temp files, asserts `.exists()` before/after); successful `generateImage` after `setLoadedImage` deletes the previous file. Skipped rapid-back-to-back races + cancellation — the rapid case is a latent VM bug (no cancel of in-flight) that should be fixed before being pinned by tests. **F3**: minimal seed `EnergizeButtonTest` in `androidTest/.../ui/` exercises the three state-dependent renders (Idle/Loading/Success → "ENERGIZE"/"ENERGIZING…"/"RE-ENERGIZE", correct enabled state, clickable). Remaining critical paths (blank-prompt gating, error title + Retry, Save/Share gating, model picker select/dismiss) left as follow-ups. **F4**: removed `ExampleUnitTest` and `ExampleInstrumentedTest`. Build verified inside Android Studio (CLI build still blocked at the gradle script layer, unrelated to test code). |
 | **PR 10** | E4 | 2026-06-03 | Per-caption text styling. **Data model**: new `ui/CaptionStyle.kt` with a `CaptionStyle` data class and three enums — `CaptionFont` (`IMPACT` = Anton + Black, `BOLD_SANS` = Inter + Bold, `SERIF` = system Serif + Bold), `CaptionFill` (`WHITE`, `YELLOW = #FFD53D`, `BLACK`, `RED = #E74C4C`), `CaptionAlign` (`LEFT`/`CENTER`/`RIGHT` → `TextAlign.Start`/`Center`/`End`). Defaults (IMPACT + WHITE + CENTER + outline-on) replicate the prior hardcoded rendering byte-for-byte so existing captions look unchanged. **Overlay**: `MemeTextOverlay` gained `style: CaptionStyle` and `onOpenStyleSheet: () -> Unit` params. Hardcoded `MemeCaptionFontFamily` / `FontWeight.Black` / `Color.White` / `TextAlign.Center` are gone — every value reads from `style`. The stroke pass is now gated on `style.outline`; the placeholder uses `fillColor.copy(alpha = …)` instead of always-white. `findBestFitFontSize` threads `fontWeight` through so non-Black weights measure honestly. New `StyleChip` (`Icons.Outlined.FormatColorText`, Plasma500 tint, Space600 fill, matching DeleteChip's visual idiom) sits at `Alignment.TopStart` inside the chrome's `AnimatedVisibility(fadeIn/fadeOut tween 160)` block — visible on focus, fades out for capture so it never bakes into the saved bitmap. **Sheet**: new `ui/CaptionStyleSheet.kt`, modeled on `ModelPickerSheet` (`ModalBottomSheet`, `skipPartiallyExpanded = true`, Space700 container, Space900 scrim 0.65α, 40×4dp Space500 drag handle). Four sections: font row (3 swatches rendered in their own typeface), color row (4 circular swatches, checkmark on selected with inverted tint for white/yellow), alignment row (3 icon buttons using `FormatAlignLeft/Center/Right`), outline `Switch`. `onStyleChange` fires on every interaction so the underlying caption updates live — the user sees their pick reflect immediately and dismisses when satisfied. **Wiring**: `MemeCanvas` now owns `topStyle` / `bottomStyle` (each a `CaptionStyle()`) plus a private `CaptionTarget? { TOP, BOTTOM }` for which caption the sheet is editing. Top and bottom captions style independently; opening the sheet from one caption never affects the other. The sheet is mounted at the function root (sibling of the canvas Box) keyed on the target, so the popup-window-based sheet doesn't fight the canvas's clip-RoundedCornerShape. **Strings**: 16 new resources (sheet title, four section labels, three font names, four color names, three alignment a11y labels, chip content description). Skipped E2 (multi-text-box) at user request — top + bottom keep their roles. Build verified inside Android Studio (CLI build is blocked at the gradle script layer by an in-flight AGP/Gradle interaction unrelated to this change). |
 
 Legend in section headings / table: ✅ **DONE** = implemented; ⚠️ **DONE w/ deviation** = implemented but differs from the original recommendation in some material way; 🚫 **NOT APPLICABLE** = the original recommendation does not apply to this app's stance (e.g., distribution-grade policy items on a personal build); (blank) = not yet started.
@@ -490,7 +491,7 @@ Saves PNG only. JPG would be smaller. WebP smaller still. Power users would appr
 
 # Group F — Testing (P2)
 
-### F1. Repository is untested [P1]
+### F1. Repository is untested [P1] ✅ **DONE (PR 11, 2026-06-04)**
 `ReplicateImageRepository` has all the polling, status mapping, and friendly-error logic — **zero tests**. This is the riskiest single class in the codebase.
 
 **Action:** Inject a `FakeReplicateApi` and cover:
@@ -501,22 +502,30 @@ Saves PNG only. JPG would be smaller. WebP smaller still. Power users would appr
 - timeout
 - 401/402/404/429/5xx responses → correct typed errors (once B2 lands)
 
-### F2. ViewModel coverage is thin [P2]
+**Implementation note:** new `ReplicateImageRepositoryTest` with a small `FakeReplicateApi` and Retrofit `Response.success` / `Response.error` stubs. 14 tests cover: invalid model id; 401/402/404/429-with-retry-after/429-without/503 → typed variants; model missing `latest_version`; `createPrediction` HTTP error mapping; prediction-failed-with-error-message; prediction-canceled; prediction-succeeded-with-empty-output; getPrediction HTTP failure mid-poll → Timeout (pinned to document current behavior); network exception → `Unexpected(message)`. Skipped: full happy-path download (would need MockWebServer for the URL fetch) and wall-clock-driven 120s timeout (depends on `System.currentTimeMillis`, not virtual time). Both gaps noted in comments where relevant.
+
+### F2. ViewModel coverage is thin [P2] ⚠️ **DONE w/ partial scope (PR 11, 2026-06-04)**
 `MainViewModelTest` covers `Idle → Loading → Success/Error`. Missing:
 - `selectModel` updates flow
 - rapid back-to-back `generateImage` calls (race / overlapping requests)
 - cancellation
 - successful generation cleans up the previous file
 
-### F3. No UI / Compose tests [P2]
+**Implementation note:** added four tests covering `selectModel`, `setLoadedImage` flips to Success, `setLoadedImage` deletes the previously tracked file, and successful generation deletes the previously tracked file. Skipped rapid-back-to-back races and cancellation — both depend on `viewModelScope` interaction quirks; the rapid case in particular is a latent bug (later `generateImage` call doesn't cancel the earlier one) that should be fixed before being pinned by tests, not the other way round. Flag as a follow-up if the race becomes user-visible.
+
+### F3. No UI / Compose tests [P2] ⚠️ **DONE w/ minimal seed (PR 11, 2026-06-04)**
 Compose UI test deps are already wired (`androidx.compose.ui.test.junit4`). Cover the critical paths:
 - prompt entry + Energize disabled until non-blank
 - error state shows themed title + Retry
 - Save/Share disabled until Success
 - model picker selects and dismisses
 
-### F4. Stub tests should go [P3]
+**Implementation note:** added one demonstration test, `EnergizeButtonTest`, covering the three state-dependent renders (Idle → "ENERGIZE" + enabled + clickable; Loading → "ENERGIZING…" + disabled; Success → "RE-ENERGIZE" + enabled). The remaining critical paths (Energize disable on blank prompt, error state title + Retry, Save/Share gating, model picker select+dismiss) need either lifting state out of `MemeContent` so it can be tested in isolation, or full-screen UI tests with a real or fake VM — both bigger lifts. Left as a follow-up; the seed proves the pattern and the deps work. Note also: the "Energize disabled when prompt blank" path in the review is currently *not* implemented as a disabled-button — `onEnergize` early-returns on blank, the button stays enabled. That's a UX-spec discrepancy to resolve before pinning a test on it.
+
+### F4. Stub tests should go [P3] ✅ **DONE (PR 11, 2026-06-04)**
 `ExampleUnitTest` and `ExampleInstrumentedTest` are skeletons from the template. Delete.
+
+**Implementation note:** both files removed.
 
 ### F5. No `ImageUtils` tests [P2]
 `saveBitmapToGallery` and `shareBitmap` could be covered with Robolectric or instrumented tests against a fake MediaStore/FileProvider. Lower priority but they have a fair amount of branching (pre-Q vs Q+).
@@ -612,10 +621,10 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | E12 | Product | P3 | No analytics |
 | E13 | Legal | P0 | (dup A6) |
 | E14 | Product | P3 | No format choice on save |
-| F1 | Tests | P1 | Repository untested |
-| F2 | Tests | P2 | ViewModel coverage thin |
-| F3 | Tests | P2 | No UI tests |
-| F4 | Tests | P3 | Stub tests should be deleted |
+| F1 | Tests | P1 | ✅ Repository untested *(PR 11, 14 tests via FakeReplicateApi + stubbed Retrofit Responses)* |
+| F2 | Tests | P2 | ⚠️ ViewModel coverage thin *(PR 11, partial — added selectModel, setLoadedImage, cleanup; rapid-race + cancel skipped pending VM fix)* |
+| F3 | Tests | P2 | ⚠️ No UI tests *(PR 11, minimal seed — EnergizeButtonTest; remaining critical paths still uncovered)* |
+| F4 | Tests | P3 | ✅ Stub tests should be deleted *(PR 11)* |
 | F5 | Tests | P2 | ImageUtils untested |
 | G1 | Build | P2 | AGP/Kotlin on alpha |
 | G2 | Build | P3 | JDK 11 → 17 |
@@ -642,7 +651,7 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **OOB — Compact-layout rebuild + D1:** moved Prompt/HUD/Energize above the canvas to dodge the IME, added tap-outside-to-dismiss. ✅ **landed 2026-06-01.** Commit `ba753fe`. Closes D1.
 - **OOB — Visual polish:** D11 nebula gradient + color-coded prompt chips + Photon500 theme color + copy edits ("Re-energize"). ✅ **landed 2026-06-03.** Commit `fad071f`. Closes D11.
 - **PR 10 — Text styling:** E4. ✅ **landed 2026-06-03.** Per-caption font/color/alignment/outline via a `StyleChip` on the chrome → `CaptionStyleSheet` bottom sheet; live preview as the user picks. E2 (N text boxes) and E3 (aspect ratios) deprioritized at user request.
-- **PR 11 — Repo + UI tests:** F1, F2, F3, F4.
-- **PR 12 — Brand + legal:** A6, E13, E11.
+- **PR 11 — Repo + UI tests:** F1, F2 (partial), F3 (seed), F4. ✅ **landed 2026-06-04.** F1 fully covered via `FakeReplicateApi` + stubbed Retrofit responses (14 tests). F2 has the safe extensions; rapid-race and cancellation deferred behind a VM fix. F3 has one demonstration test; remaining critical paths are follow-ups. F4 deleted.
+- **PR 12 — Brand + legal:** A6, E13, E11. *(Likely deprioritized for personal-only scope; revisit before any distribution.)*
 
 Happy to drive any one of these. Tell me which group to start with.

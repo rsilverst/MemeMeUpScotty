@@ -4,6 +4,7 @@ import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
+import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -119,5 +121,65 @@ class MainViewModelTest {
 
         val errorState = viewModel.generationState.value as GenerationState.Error
         assertEquals(GenerationError.AuthRejected, errorState.error)
+    }
+
+    @Test
+    fun selectModel_updatesSelectedModelFlow() {
+        val viewModel = MainViewModel(MockImageRepository())
+        assertEquals(ImageModel.JUGGERNAUT, viewModel.selectedModel.value)
+
+        viewModel.selectModel(ImageModel.FLUX_SCHNELL)
+        assertEquals(ImageModel.FLUX_SCHNELL, viewModel.selectedModel.value)
+    }
+
+    @Test
+    fun setLoadedImage_flipsStateToSuccess() {
+        val viewModel = MainViewModel(MockImageRepository())
+        val file = File.createTempFile("vm-loaded-", ".img").apply { deleteOnExit() }
+
+        viewModel.setLoadedImage(file)
+
+        val state = viewModel.generationState.value
+        assertTrue(state is GenerationState.Success)
+        assertEquals(file, (state as GenerationState.Success).imageFile)
+    }
+
+    @Test
+    fun setLoadedImage_deletesPreviouslyTrackedFile() {
+        val viewModel = MainViewModel(MockImageRepository())
+        val first = File.createTempFile("vm-prev-", ".img").apply { deleteOnExit() }
+        val second = File.createTempFile("vm-next-", ".img").apply { deleteOnExit() }
+        assertTrue(first.exists())
+
+        viewModel.setLoadedImage(first)
+        viewModel.setLoadedImage(second)
+
+        // First should be cleaned up; second is now the tracked image.
+        assertFalse("previous file should have been deleted", first.exists())
+        assertTrue("new file should still exist", second.exists())
+    }
+
+    @Test
+    fun successfulGeneration_deletesPreviouslyTrackedFile() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val viewModel = MainViewModel(mockRepository)
+        val cacheDir = File("dummy_cache")
+        val first = File.createTempFile("gen-prev-", ".img").apply { deleteOnExit() }
+
+        // Seed the VM with a tracked file via setLoadedImage, then run a
+        // successful generation and confirm the prior file is cleaned up.
+        viewModel.setLoadedImage(first)
+        assertTrue(first.exists())
+
+        val second = File.createTempFile("gen-next-", ".img").apply { deleteOnExit() }
+        mockRepository.outcomeToReturn = GenerationOutcome.Success(second)
+
+        viewModel.generateImage("prompt", cacheDir)
+        mockRepository.gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse("previous tracked file should have been deleted", first.exists())
+        val state = viewModel.generationState.value as GenerationState.Success
+        assertEquals(second, state.imageFile)
     }
 }
