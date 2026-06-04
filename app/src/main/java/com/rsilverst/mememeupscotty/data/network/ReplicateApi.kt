@@ -1,5 +1,6 @@
 package com.rsilverst.mememeupscotty.data.network
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import retrofit2.Response
 import retrofit2.http.Body
@@ -17,7 +18,7 @@ data class ReplicatePredictionRequest(
 data class ReplicateModel(
     val owner: String,
     val name: String,
-    val latest_version: ReplicateModelVersion?
+    @Json(name = "latest_version") val latestVersion: ReplicateModelVersion?
 )
 
 @JsonClass(generateAdapter = true)
@@ -28,11 +29,11 @@ data class ReplicateModelVersion(
 @JsonClass(generateAdapter = true)
 data class ReplicatePredictionInput(
     val prompt: String,
-    val negative_prompt: String? = null,
+    @Json(name = "negative_prompt") val negativePrompt: String? = null,
     val width: Int? = null,
     val height: Int? = null,
     val seed: Int? = null,
-    val disable_safety_checker: Boolean? = null
+    @Json(name = "disable_safety_checker") val disableSafetyChecker: Boolean? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -44,11 +45,11 @@ data class ReplicatePrediction(
 )
 
 // Replicate returns failure bodies like {"detail": "...", "retry_after": 30}.
-// retry_after is only present on 429 responses.
+// retryAfter is only present on 429 responses.
 @JsonClass(generateAdapter = true)
 data class ReplicateErrorBody(
     val detail: String? = null,
-    val retry_after: Int? = null
+    @Json(name = "retry_after") val retryAfter: Int? = null
 )
 
 interface ReplicateApi {

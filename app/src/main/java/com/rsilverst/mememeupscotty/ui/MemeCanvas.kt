@@ -37,7 +37,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,6 +83,7 @@ import com.rsilverst.mememeupscotty.ui.theme.TextHigh
 import com.rsilverst.mememeupscotty.ui.theme.TextLow
 import com.rsilverst.mememeupscotty.ui.theme.TextMid
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
+import kotlinx.coroutines.delay
 import kotlin.math.sin
 
 // Square canvas containing the active state (idle / loading / image / error)
@@ -431,6 +434,17 @@ private fun TransporterPad(modifier: Modifier = Modifier) {
 
 @Composable
 private fun LoadingState() {
+    // Elapsed-second counter so the user has some sense of progress on slow
+    // models. Restarts whenever LoadingState re-enters composition (i.e. a
+    // new generation begins).
+    var elapsedSec by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            elapsedSec++
+        }
+    }
+
     val infinite = rememberInfiniteTransition(label = "shimmer")
     val scanOffset by infinite.animateFloat(
         initialValue = 0f,
@@ -519,6 +533,14 @@ private fun LoadingState() {
                 style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 4.sp),
                 color = Plasma300
             )
+            if (elapsedSec > 0) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "T+${elapsedSec}S",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextLow
+                )
+            }
         }
     }
 }

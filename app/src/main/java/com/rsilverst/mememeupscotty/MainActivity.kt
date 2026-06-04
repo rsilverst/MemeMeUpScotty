@@ -8,13 +8,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rsilverst.mememeupscotty.data.network.NetworkModule
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
 import com.rsilverst.mememeupscotty.data.repository.ReplicateImageRepository
 import com.rsilverst.mememeupscotty.ui.MemeScreen
 import com.rsilverst.mememeupscotty.ui.theme.MemeMeUpScottyTheme
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
-import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -50,7 +51,9 @@ class MainActivity : ComponentActivity() {
         }
 
         val imageRepository: ImageRepository = ReplicateImageRepository(NetworkModule.replicateApi)
-        val factory = MainViewModelFactory(imageRepository)
+        val factory = viewModelFactory {
+            initializer { MainViewModel(imageRepository) }
+        }
 
         setContent {
             MemeMeUpScottyTheme {

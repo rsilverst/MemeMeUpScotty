@@ -1,7 +1,6 @@
 package com.rsilverst.mememeupscotty.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
@@ -93,17 +92,5 @@ class MainViewModel(
                 // Suppress deletion errors
             }
         }
-    }
-}
-
-class MainViewModelFactory(
-    private val imageRepository: ImageRepository
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MainViewModel(imageRepository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

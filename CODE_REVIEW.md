@@ -24,6 +24,7 @@ Track of what's been landed. Each entry: PR, items, date, deviations from the or
 | **OOB — Release signing** | (release prep, not in review) | 2026-06-01 | Wires release `signingConfig` from four `local.properties` entries (`RELEASE_KEYSTORE_FILE`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`). When any property is missing, the `signingConfigs` block isn't created and the release variant stays unsigned, so fresh checkouts and CI without a keystore still build. `.gitignore` broadened to ignore the whole `.claude/` directory plus `*.jks` / `*.keystore` patterns. Not strictly a review item but enables a real distributable APK once A1 / A6 are addressed. Commit `22cef38`. |
 | **OOB — Compact layout rebuild** | D1, IME keyboard fix | 2026-06-01 | The bottom-stacked prompt input collided with the soft keyboard on phones. Rebuilt `CompactLayout` so all inputs sit above the canvas (Prompt → HUD → Energize → Canvas → Save/Share row). Caption editing on the canvas now works under the keyboard because the scroll viewport shrinks by the IME inset; `imePadding()` on the scrolling Column lets default bring-into-view scroll the focused caption above the keyboard. **D1 (tap-outside-to-dismiss)**: a `pointerInput` tap handler on the scrolling Column calls `focusManager.clearFocus()` when the user taps empty space; taps on `BasicTextField`s are consumed by the field, so the outer handler only fires for empty-area taps. Dropped the now-unused `Dock` composable (and its two previews) since the compact layout inlines those pieces directly; the expanded tablet layout already inlined them and is unchanged. Commit `ba753fe`. |
 | **OOB — Visual polish** | D11 | 2026-06-03 | **D11 (background gradient is almost flat)**: replaced the 3-stop `Space900 → 0xFF0D1128 → Space900` gradient with a 4-stop nebula gradient using deep indigo, warm magenta, and cold teal, so the "deep space" intent reads at typical viewport sizes. Also color-coded the three idle-state suggested-prompt chips: `PromptChip` refactored to accept `borderColor` / `textColor` / `backgroundColor`, and the chips now use `Plasma500` (blue), the new `Photon500` (purple), and `Solar500` (gold) derived with varying alpha. Copy edits: "Try one of these" → "Or try one of these", "Energize Again" → "Re-energize". Does not change D5 (chips still fill the prompt rather than auto-generating). Commit `fad071f`. |
+| **PR 13** | B4, B6, C11 (pin), C12 + B3/B8/E12 deprioritized | 2026-06-04 | Quick-batch cleanup. **B4 (snake_case → camelCase)**: `latest_version`/`negative_prompt`/`disable_safety_checker`/`retry_after` on the four Replicate DTOs (`ReplicateModel`, `ReplicatePredictionInput`, `ReplicateErrorBody`) renamed to camelCase with `@Json(name = "…")` to preserve the wire format. Four call sites in `ImageRepository` updated; two test fixture call sites in `ReplicateImageRepositoryTest` updated. Wire-side JSON in test body strings (e.g. `"retry_after":42`) intentionally left snake_case. **B6 (modern ViewModelFactory)**: deleted the `MainViewModelFactory` class entirely; `MainActivity.onCreate` now builds the factory inline with `viewModelFactory { initializer { MainViewModel(imageRepository) } }` from `androidx.lifecycle.viewmodel.{viewModelFactory, initializer}`. Removed the now-unused `androidx.lifecycle.ViewModelProvider` import from `MainViewModel.kt`. **C11 (pin)**: just a documentation correction — the `shared_meme_*` leak was actually closed back in PR 9 when `MainActivity.onCreate` cache cleanup was widened to all three prefixes (`generated_meme_*`/`gallery_meme_*`/`shared_meme_*`); PR 9 noted it only as a "sub-piece" side effect. Pinning the row fully closed; no code change. **C12 (loading progress)**: small elapsed-time counter rendered in-theme as `"T+5S"` (Stardate vibe) using `MaterialTheme.typography.labelMedium` (mono) in `TextLow`. 6dp under the "MATERIALIZING" label. Driven by a local `LaunchedEffect(Unit) { while (true) { delay(1000); elapsedSec++ } }` inside `LoadingState`; conditional `if (elapsedSec > 0)` skips the noisy `T+0S` flash before any time has actually passed. Restarts whenever LoadingState re-enters composition (i.e. a new generation begins). **Deprioritized**: B3 (paper-only — the brief is aspirational, single-screen app doesn't need Nav3 or material3.adaptive), B8 (PR 11's `FakeReplicateApi` already injects at the `ReplicateApi` seam — NetworkModule's static-singleton shape doesn't actually block tests), E12 (single-user app — Play-distribution-grade hygiene that doesn't apply, same family as A2/E10). Build verified: `./gradlew :app:testDebugUnitTest` passes 21/21. Kotlin emits four "annotation target shifting in future Kotlin" warnings on the `@Json` lines — benign for Moshi codegen which reads the parameter-target annotation today, and the future-Kotlin behavior of also applying to property doesn't break anything for our use. Worth a one-line `-Xannotation-default-target=…` compiler arg if the warnings become noise. |
 | **PR 11** | F1, F2 (partial), F3 (seed), F4 | 2026-06-04 | Test surface buildout. **F1**: new `ReplicateImageRepositoryTest` with a small file-private `FakeReplicateApi` and Retrofit `Response.success` / `Response.error` stubs (no MockWebServer dependency). 14 tests cover: invalid model id (no `/`); 401/402/404/429-with-retry-after/429-without/503 → typed `AuthRejected`/`OutOfCredit`/`ModelUnavailable`/`RateLimited(seconds)`/`RateLimited(null)`/`Server(503)`; model returned with `latest_version = null` → `Unexpected("no published version")`; `createPrediction` 402 → `OutOfCredit` (smoke-test that error mapping runs on the second API call too); poll terminal `status = "failed"` with error message → `Unexpected(error)`; poll terminal `status = "canceled"` → `Unexpected("...canceled")`; poll terminal `status = "succeeded"` with `output = null` → `Unexpected("no image")`; getPrediction HTTP failure mid-poll → `Timeout` (pinned to document current "null from poll = Timeout" semantics so a deliberate semantic change has a failing test); thrown `RuntimeException` from getModel → `Unexpected(message)`. Skipped: full happy-path download (needs MockWebServer for the `replicate.delivery` URL fetch) and wall-clock-driven 120s timeout (`System.currentTimeMillis` is real time, not virtual). **F2**: extended `MainViewModelTest` with `selectModel` updates the flow; `setLoadedImage` flips state to `Success`; `setLoadedImage` deletes the previously tracked file (real temp files, asserts `.exists()` before/after); successful `generateImage` after `setLoadedImage` deletes the previous file. Skipped rapid-back-to-back races + cancellation — the rapid case is a latent VM bug (no cancel of in-flight) that should be fixed before being pinned by tests. **F3**: minimal seed `EnergizeButtonTest` in `androidTest/.../ui/` exercises the three state-dependent renders (Idle/Loading/Success → "ENERGIZE"/"ENERGIZING…"/"RE-ENERGIZE", correct enabled state, clickable). Remaining critical paths (blank-prompt gating, error title + Retry, Save/Share gating, model picker select/dismiss) left as follow-ups. **F4**: removed `ExampleUnitTest` and `ExampleInstrumentedTest`. Build verified inside Android Studio (CLI build still blocked at the gradle script layer, unrelated to test code). |
 | **PR 10** | E4 | 2026-06-03 | Per-caption text styling. **Data model**: new `ui/CaptionStyle.kt` with a `CaptionStyle` data class and three enums — `CaptionFont` (`IMPACT` = Anton + Black, `BOLD_SANS` = Inter + Bold, `SERIF` = system Serif + Bold), `CaptionFill` (`WHITE`, `YELLOW = #FFD53D`, `BLACK`, `RED = #E74C4C`), `CaptionAlign` (`LEFT`/`CENTER`/`RIGHT` → `TextAlign.Start`/`Center`/`End`). Defaults (IMPACT + WHITE + CENTER + outline-on) replicate the prior hardcoded rendering byte-for-byte so existing captions look unchanged. **Overlay**: `MemeTextOverlay` gained `style: CaptionStyle` and `onOpenStyleSheet: () -> Unit` params. Hardcoded `MemeCaptionFontFamily` / `FontWeight.Black` / `Color.White` / `TextAlign.Center` are gone — every value reads from `style`. The stroke pass is now gated on `style.outline`; the placeholder uses `fillColor.copy(alpha = …)` instead of always-white. `findBestFitFontSize` threads `fontWeight` through so non-Black weights measure honestly. New `StyleChip` (`Icons.Outlined.FormatColorText`, Plasma500 tint, Space600 fill, matching DeleteChip's visual idiom) sits at `Alignment.TopStart` inside the chrome's `AnimatedVisibility(fadeIn/fadeOut tween 160)` block — visible on focus, fades out for capture so it never bakes into the saved bitmap. **Sheet**: new `ui/CaptionStyleSheet.kt`, modeled on `ModelPickerSheet` (`ModalBottomSheet`, `skipPartiallyExpanded = true`, Space700 container, Space900 scrim 0.65α, 40×4dp Space500 drag handle). Four sections: font row (3 swatches rendered in their own typeface), color row (4 circular swatches, checkmark on selected with inverted tint for white/yellow), alignment row (3 icon buttons using `FormatAlignLeft/Center/Right`), outline `Switch`. `onStyleChange` fires on every interaction so the underlying caption updates live — the user sees their pick reflect immediately and dismisses when satisfied. **Wiring**: `MemeCanvas` now owns `topStyle` / `bottomStyle` (each a `CaptionStyle()`) plus a private `CaptionTarget? { TOP, BOTTOM }` for which caption the sheet is editing. Top and bottom captions style independently; opening the sheet from one caption never affects the other. The sheet is mounted at the function root (sibling of the canvas Box) keyed on the target, so the popup-window-based sheet doesn't fight the canvas's clip-RoundedCornerShape. **Strings**: 16 new resources (sheet title, four section labels, three font names, four color names, three alignment a11y labels, chip content description). Skipped E2 (multi-text-box) at user request — top + bottom keep their roles. Build verified inside Android Studio (CLI build is blocked at the gradle script layer by an in-flight AGP/Gradle interaction unrelated to this change). |
 
@@ -168,12 +169,14 @@ sealed class GenerationError {
 ```
 UI maps each variant to title + detail.
 
-### B3. Stated architecture vs. actual [P1]
+### B3. Stated architecture vs. actual [P1] 🚫 **DEPRIORITIZED — paper-only (PR 13, 2026-06-04)**
 The brief in `app/.agent/plan.md` lists **Jetpack Navigation 3** and **Compose Material Adaptive** as the navigation/adaptive strategy. Neither is in the dependencies. The app is single-screen and uses a hand-rolled `screenWidthDp >= 840` check.
 
 **Action:** Either update the brief to reflect reality (recommended — single screen doesn't need Nav3), or adopt `androidx.compose.material3.adaptive` for the breakpoint and any future foldable support.
 
-### B4. Snake-case Kotlin property names on data classes [P1]
+**Implementation note:** the brief is aspirational, the code is what it is — a single-screen app with one width breakpoint doesn't need Nav3 or material3.adaptive. Closing as paper-only; if the screen graph ever grows beyond one, reopen and revisit.
+
+### B4. Snake-case Kotlin property names on data classes [P1] ✅ **DONE (PR 13, 2026-06-04)**
 **File:** `data/network/ReplicateApi.kt:11-44`, `data/repository/ImageRepository.kt:43`
 
 `latest_version`, `negative_prompt`, `disable_safety_checker` are Kotlin properties with snake_case. Works because Moshi serializes by property name. Violates Kotlin style and confuses readers about intent.
@@ -183,6 +186,8 @@ The brief in `app/.agent/plan.md` lists **Jetpack Navigation 3** and **Compose M
 @Json(name = "latest_version") val latestVersion: ReplicateModelVersion?
 ```
 
+**Implementation note:** renamed `latest_version`/`negative_prompt`/`disable_safety_checker`/`retry_after` to camelCase with `@Json(name = "…")` to preserve the wire format. Updated the four call sites in `ImageRepository` and the two test fixture call sites in `ReplicateImageRepositoryTest`. Test JSON body strings (e.g. `"retry_after":42`) intentionally stay snake_case — that's still the wire-side spelling.
+
 ### B5. Mixed JSON parsers [P2] ✅ **DONE (PR 6, 2026-05-30)**
 **File:** `data/repository/ImageRepository.kt:128-138`
 
@@ -190,12 +195,14 @@ The brief in `app/.agent/plan.md` lists **Jetpack Navigation 3** and **Compose M
 
 **Action:** Define a `@JsonClass` `ReplicateError(detail: String?, retry_after: Int?)`, parse with Moshi.
 
-### B6. Hand-rolled `ViewModelFactory` is dated [P2]
+### B6. Hand-rolled `ViewModelFactory` is dated [P2] ✅ **DONE (PR 13, 2026-06-04)**
 **File:** `ui/viewmodel/MainViewModel.kt:81-91`, `MainActivity.kt:42-47`
 
 Boilerplate. Modern pattern uses the `viewModel { initializer { … } }` API or Hilt.
 
 **Action:** Replace with a `viewModelFactory { initializer { MainViewModel(repo) } }` declared in MainActivity, drop the factory class entirely.
+
+**Implementation note:** dropped the `MainViewModelFactory` class entirely. `MainActivity` now builds the factory inline with `viewModelFactory { initializer { MainViewModel(imageRepository) } }` from `androidx.lifecycle.viewmodel.{viewModelFactory, initializer}`. Removed the now-unused `androidx.lifecycle.ViewModelProvider` import from `MainViewModel.kt`.
 
 ### B7. Hardcoded "photorealistic" style suffix conflicts with stylized models [P1 — bug] ✅ **DONE (PR 3, 2026-05-29)**
 **File:** `data/repository/ImageRepository.kt:146-147`
@@ -209,12 +216,14 @@ Appended to every prompt regardless of model. Users who select **Blue Pencil XL 
 
 **Implementation note (PR 3, 2026-05-29):** went a slightly different route from "put it on `ImageModel`" — the per-model config (`MODEL_PROMPT_CONFIGS` map keyed by Replicate model id, plus a private `ModelPromptConfig` data class) lives in `ImageRepository.kt`. Reasoning: `ImageModel` is in the `ui.viewmodel` package, and putting prompt-shaping data on a UI-layer enum would couple the data layer to UI. Keeping the configs string-keyed in the repository preserves layer separation; if `ImageModel.id` values change, the map keys need to follow. Also landed expanded anatomy/duplication negatives for the same artifacts users were actually seeing (extra/fused fingers, twins, mangled limbs) — that scope was outside B7 strictly but was the motivating reason to revisit this file. See the PR 3 row in the Status Log above for full details.
 
-### B8. `NetworkModule` is an `object` singleton with no swappable seam [P2]
+### B8. `NetworkModule` is an `object` singleton with no swappable seam [P2] 🚫 **DEPRIORITIZED — current tests don't need it (PR 13, 2026-06-04)**
 **File:** `data/network/NetworkModule.kt`
 
 Functional now. Becomes a problem as soon as you want a `FakeReplicateApi` for instrumentation tests, or a second network module for A/B'd proxies.
 
 **Action:** Either Hilt (heavyweight) or a simple `interface NetworkProvider` with one prod and one test impl, injected from `MainActivity`.
+
+**Implementation note:** PR 11's `FakeReplicateApi` injects at the `ReplicateApi` interface level (the seam that already exists), so the NetworkModule's static-singleton shape doesn't actually block the test surface. Revisit if a second prod backend (e.g. proxy A/B) lands.
 
 ### B9. ImageModel.label is dead code [P3]
 **File:** `ui/viewmodel/MainViewModel.kt:13-21`
@@ -311,17 +320,21 @@ Top and bottom captions can be dragged onto each other with no detection. Minor;
 
 Manifest correctly scopes the permission to `maxSdkVersion="28"`; runtime check correctly gates on `SDK_INT < Q`. OK. Informational only.
 
-### C11. `lastGeneratedFile` lifetime is fragile [P2]
+### C11. `lastGeneratedFile` lifetime is fragile [P2] ✅ **DONE (PR 9 side effect; pinned PR 13, 2026-06-04)**
 **File:** `ui/viewmodel/MainViewModel.kt:40-65`
 
 Deleted on `onCleared` and on each next success. If the activity is killed without `onCleared` (process death), the file orphans in cache. The `MainActivity.onCreate` cleanup catches it — but only on next cold start, and only files named `generated_meme_*`. The shared file from `shareBitmap` is `shared_meme_*` and not cleaned anywhere.
 
 **Action:** Either include `shared_meme_*` in the startup cleanup, or use a `WorkManager`-backed periodic cache cleanup.
 
-### C12. Loading state has no progress or elapsed indication [P2 — UX]
+**Implementation note:** the simpler of the two actions was taken back in PR 9: `MainActivity.onCreate` cleanup was widened to include `gallery_meme_*` *and* `shared_meme_*` alongside the original `generated_meme_*`. No `WorkManager` — for a personal-use app the cold-start sweep is sufficient (process death is rare and a single accumulated cache file isn't a real footprint problem). Pinning this closed now since the PR 9 row only noted it as a "sub-piece" side effect.
+
+### C12. Loading state has no progress or elapsed indication [P2 — UX] ✅ **DONE (PR 13, 2026-06-04)**
 The shimmer animates but doesn't communicate progress. SDXL Lightning often returns in 3-8s; the user has no idea if 30s is "normal" or "stuck."
 
 **Action:** Show elapsed seconds, or a "Usually takes 5-10s" hint.
+
+**Implementation note:** went with the elapsed-seconds option, rendered in-theme as `"T+5S"` (Stardate vibe) using `MaterialTheme.typography.labelMedium` (monospace `MonoFontFamily`) in `TextLow`. Sits 6dp under the "MATERIALIZING" label inside `LoadingState`. A local `LaunchedEffect(Unit) { while (true) { delay(1000); elapsedSec++ } }` ticks the counter, and the conditional `if (elapsedSec > 0)` keeps the first second clean (no `T+0S` flash before any time has actually passed).
 
 ---
 
@@ -479,8 +492,10 @@ Tied to A2. Even with safety on, Play policy expects an in-app "report this" pat
 ### E11. No about/credits/attribution screen [P2]
 Several Replicate models have specific attribution or non-commercial clauses. Compliance + courtesy.
 
-### E12. No analytics [P3]
+### E12. No analytics [P3] 🚫 **NOT APPLICABLE — personal-build stance (PR 13, 2026-06-04)**
 No way to know which models/prompts users prefer in the wild. Not blocking; just flag.
+
+**Implementation note:** single-user app, no fleet to learn from. Same family as A2/E10 — Play-distribution-grade hygiene that doesn't apply here. Marking N/A; reopen if the distribution stance ever changes.
 
 ### E13. App name + theme = trademark exposure [P0 — see A6]
 
@@ -567,12 +582,12 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | A7 | Security | — | Token-on-disk audit (informational) |
 | B1 | Architecture | P1 | ✅ 2,025-LOC MemeScreen.kt *(PR 4, split into 8 files; largest now 570 LOC)* |
 | B2 | Architecture | P1 | ✅ Stringly-typed errors across layers *(PR 6)* |
-| B3 | Architecture | P1 | Brief vs. actual divergence |
-| B4 | Code style | P1 | snake_case Kotlin properties |
+| B3 | Architecture | P1 | 🚫 Brief vs. actual divergence — paper-only |
+| B4 | Code style | P1 | ✅ snake_case Kotlin properties *(PR 13, camelCase + `@Json(name=…)`)* |
 | B5 | Code style | P2 | ✅ Mixed JSON parsers *(PR 6)* |
-| B6 | Code style | P2 | Hand-rolled ViewModelFactory |
+| B6 | Code style | P2 | ✅ Hand-rolled ViewModelFactory *(PR 13, inline `viewModelFactory { initializer {…} }`)* |
 | B7 | Correctness | P1 | ✅ Photorealistic suffix on stylized models *(PR 3, also expanded artifact negatives)* |
-| B8 | Architecture | P2 | NetworkModule has no swappable seam |
+| B8 | Architecture | P2 | 🚫 NetworkModule has no swappable seam — current tests inject at the `ReplicateApi` seam |
 | B9 | Cleanup | P3 | Dead `ImageModel.label` field |
 | C1 | Correctness | P1 | ✅ GraphicsLayer capture is racy *(PR 7, `delay(200)` covers fadeOut)* |
 | C2 | Performance | P2 | ✅ Layer records every frame *(PR 7, gated on `capturing`)* |
@@ -584,8 +599,8 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | C8 | UX | P1 | ✅ No drag-bounds clamping *(PR 8, clamp overlay rect inside canvas + cap resize)* |
 | C9 | UX | P2 | Caption collision unhandled |
 | C10 | Permissions | — | Pre-Q permission path verified |
-| C11 | Correctness | P2 | `shared_meme_*` files leak |
-| C12 | UX | P2 | No loading progress |
+| C11 | Correctness | P2 | ✅ `shared_meme_*` files leak *(PR 9 side effect + PR 13 pin — cold-start sweep widened to all three prefixes)* |
+| C12 | UX | P2 | ✅ No loading progress *(PR 13, `T+5S` elapsed counter under MATERIALIZING)* |
 | D1 | UX | P2 | ✅ No tap-outside-to-dismiss *(OOB compact-layout rebuild, `pointerInput` + `clearFocus`)* |
 | D2 | UX | P3 | Disabled buttons silent |
 | D3 | UX | P1 | ✅ No undo for caption delete *(PR 7, "Undo" snackbar restores offset + size)* |
@@ -618,7 +633,7 @@ Source-of-truth for the redesign. Either keep with a README note about its role,
 | E9 | Product | P3 | No upscaling |
 | E10 | Policy | **P0** (distribution) | 🚫 No report-content path — N/A for personal build *(PR 2 attempted + reverted)* |
 | E11 | Product | P2 | No attribution screen |
-| E12 | Product | P3 | No analytics |
+| E12 | Product | P3 | 🚫 No analytics — N/A for personal build |
 | E13 | Legal | P0 | (dup A6) |
 | E14 | Product | P3 | No format choice on save |
 | F1 | Tests | P1 | ✅ Repository untested *(PR 11, 14 tests via FakeReplicateApi + stubbed Retrofit Responses)* |
@@ -653,5 +668,6 @@ When you're ready to tackle, I'd suggest pairing items so each PR is a coherent 
 - **PR 10 — Text styling:** E4. ✅ **landed 2026-06-03.** Per-caption font/color/alignment/outline via a `StyleChip` on the chrome → `CaptionStyleSheet` bottom sheet; live preview as the user picks. E2 (N text boxes) and E3 (aspect ratios) deprioritized at user request.
 - **PR 11 — Repo + UI tests:** F1, F2 (partial), F3 (seed), F4. ✅ **landed 2026-06-04.** F1 fully covered via `FakeReplicateApi` + stubbed Retrofit responses (14 tests). F2 has the safe extensions; rapid-race and cancellation deferred behind a VM fix. F3 has one demonstration test; remaining critical paths are follow-ups. F4 deleted.
 - **PR 12 — Brand + legal:** A6, E13, E11. *(Likely deprioritized for personal-only scope; revisit before any distribution.)*
+- **PR 13 — Quick-batch cleanup:** B4 (snake_case DTOs → camelCase + `@Json`), B6 (modern `viewModelFactory { initializer {…} }`), C11 (pin closed — already done as a PR 9 side effect), C12 (`T+5S` elapsed counter in LoadingState). Deprioritized in this PR: B3 (paper-only), B8 (current tests inject at the right seam), E12 (N/A for personal). ✅ **landed 2026-06-04.**
 
 Happy to drive any one of these. Tell me which group to start with.

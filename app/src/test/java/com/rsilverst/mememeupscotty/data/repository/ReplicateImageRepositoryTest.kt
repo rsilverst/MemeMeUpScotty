@@ -80,7 +80,7 @@ class ReplicateImageRepositoryTest {
     fun modelHasNoLatestVersion_returnsUnexpected() = runTest {
         val api = FakeReplicateApi(
             getModelResponse = Response.success(
-                ReplicateModel(owner = "test-owner", name = "test-model", latest_version = null)
+                ReplicateModel(owner = "test-owner", name = "test-model", latestVersion = null)
             )
         )
         val outcome = ReplicateImageRepository(api).generateImage(validModelId, "p", cacheDir)
@@ -166,7 +166,7 @@ class ReplicateImageRepositoryTest {
         ReplicateModel(
             owner = "test-owner",
             name = "test-model",
-            latest_version = ReplicateModelVersion(id = "v-123")
+            latestVersion = ReplicateModelVersion(id = "v-123")
         )
     )
 

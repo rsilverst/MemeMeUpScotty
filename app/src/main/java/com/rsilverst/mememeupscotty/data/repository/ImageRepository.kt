@@ -60,7 +60,7 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
             val modelResponse = api.getModel(owner, name)
             val model = unwrap(modelResponse)
                 ?: return@withContext failure(errorFor(modelResponse))
-            val versionId = model.latest_version?.id
+            val versionId = model.latestVersion?.id
                 ?: return@withContext failure(GenerationError.Unexpected("Model $owner/$name has no published version"))
 
             val config = MODEL_PROMPT_CONFIGS[modelId] ?: DEFAULT_PROMPT_CONFIG
@@ -68,11 +68,11 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
                 version = versionId,
                 input = ReplicatePredictionInput(
                     prompt = composePrompt(prompt, config),
-                    negative_prompt = config.negativePrompt,
+                    negativePrompt = config.negativePrompt,
                     seed = Random.nextInt(0, Int.MAX_VALUE),
                     // Personal/single-user app — brief explicitly says no content moderation.
                     // Models that don't accept this field ignore it.
-                    disable_safety_checker = true
+                    disableSafetyChecker = true
                 )
             )
 
@@ -143,7 +143,7 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
             401 -> GenerationError.AuthRejected
             402 -> GenerationError.OutOfCredit
             404 -> GenerationError.ModelUnavailable
-            429 -> GenerationError.RateLimited(parsed?.retry_after)
+            429 -> GenerationError.RateLimited(parsed?.retryAfter)
             in 500..599 -> GenerationError.Server(code)
             else -> GenerationError.Unexpected(parsed?.detail ?: "Replicate request failed (HTTP $code)")
         }
