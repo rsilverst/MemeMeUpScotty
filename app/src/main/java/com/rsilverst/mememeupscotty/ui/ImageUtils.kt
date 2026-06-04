@@ -142,3 +142,29 @@ suspend fun shareBitmap(context: Context, bitmap: Bitmap): Result<Unit> {
         Result.failure(e)
     }
 }
+
+fun cleanCacheDirectory(dir: File) {
+    val directoriesToScan = listOf(dir, File(dir, "images"))
+    for (scanDir in directoriesToScan) {
+        if (scanDir.exists() && scanDir.isDirectory) {
+            scanDir.listFiles()?.forEach { file ->
+                if (file.isFile) {
+                    val name = file.name
+                    if (name.startsWith("generated_meme_") ||
+                        name.startsWith("gallery_meme_") ||
+                        name.startsWith("shared_meme_")
+                    ) {
+                        file.delete()
+                    }
+                }
+            }
+        }
+    }
+    val imagesDir = File(dir, "images")
+    if (imagesDir.exists() && imagesDir.isDirectory) {
+        val list = imagesDir.listFiles()
+        if (list != null && list.isEmpty()) {
+            imagesDir.delete()
+        }
+    }
+}

@@ -14,6 +14,7 @@ import com.rsilverst.mememeupscotty.data.network.NetworkModule
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
 import com.rsilverst.mememeupscotty.data.repository.ReplicateImageRepository
 import com.rsilverst.mememeupscotty.ui.MemeScreen
+import com.rsilverst.mememeupscotty.ui.cleanCacheDirectory
 import com.rsilverst.mememeupscotty.ui.theme.MemeMeUpScottyTheme
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -33,18 +34,10 @@ class MainActivity : ComponentActivity() {
         // Proactive cleanup of orphaned cache files bound to activity lifecycle:
         // - generated_meme_* : AI generations (downloaded by ImageRepository)
         // - gallery_meme_*   : copies of user-picked photos
-        // - shared_meme_*    : FileProvider-shared bitmaps from the share sheet
+        // - shared_meme_*    : FileProvider-shared bitmaps from the share sheet (recursively cleaned)
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                cacheDir?.listFiles()?.forEach { file ->
-                    val name = file.name
-                    if (name.startsWith("generated_meme_") ||
-                        name.startsWith("gallery_meme_") ||
-                        name.startsWith("shared_meme_")
-                    ) {
-                        file.delete()
-                    }
-                }
+                cacheDir?.let { cleanCacheDirectory(it) }
             } catch (e: Exception) {
                 Log.w(TAG, "Cache cleanup failed", e)
             }
