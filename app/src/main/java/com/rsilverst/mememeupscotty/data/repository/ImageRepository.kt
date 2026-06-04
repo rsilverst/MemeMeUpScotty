@@ -6,6 +6,7 @@ import com.rsilverst.mememeupscotty.data.network.ReplicateErrorBody
 import com.rsilverst.mememeupscotty.data.network.ReplicatePrediction
 import com.rsilverst.mememeupscotty.data.network.ReplicatePredictionInput
 import com.rsilverst.mememeupscotty.data.network.ReplicatePredictionRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -99,6 +100,8 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
             }
         } catch (e: Exception) {
             tempFile?.takeIf { it.exists() }?.delete()
+            // Rethrow CancellationException to support cooperative cancellation in structured concurrency
+            if (e is CancellationException) throw e
             failure(GenerationError.Unexpected(e.message ?: "Unknown error"))
         }
     }

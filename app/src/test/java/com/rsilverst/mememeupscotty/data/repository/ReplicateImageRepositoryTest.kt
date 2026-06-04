@@ -5,6 +5,7 @@ import com.rsilverst.mememeupscotty.data.network.ReplicateModel
 import com.rsilverst.mememeupscotty.data.network.ReplicateModelVersion
 import com.rsilverst.mememeupscotty.data.network.ReplicatePrediction
 import com.rsilverst.mememeupscotty.data.network.ReplicatePredictionRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -15,6 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
 import java.io.File
+import kotlin.test.assertFailsWith
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReplicateImageRepositoryTest {
@@ -158,6 +160,17 @@ class ReplicateImageRepositoryTest {
         val outcome = ReplicateImageRepository(api).generateImage(validModelId, "p", cacheDir)
         val error = (outcome as GenerationOutcome.Failure).error as GenerationError.Unexpected
         assertEquals("network down", error.detail)
+    }
+
+    @Test
+    fun generateImage_cancellation_propagatesCorrectly() = runTest {
+        val api = FakeReplicateApi(getModelThrow = CancellationException("Job was cancelled"))
+        cacheDir.mkdirs()
+        
+        val exception = assertFailsWith<CancellationException> {
+            ReplicateImageRepository(api).generateImage(validModelId, "p", cacheDir)
+        }
+        assertEquals("Job was cancelled", exception.message)
     }
 
     // ---------- Test fixtures ----------
