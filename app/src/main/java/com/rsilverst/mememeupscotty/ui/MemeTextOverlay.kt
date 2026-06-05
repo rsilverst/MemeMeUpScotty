@@ -407,22 +407,39 @@ private fun findBestFitFontSize(
     maxWidthPx: Int,
     maxHeightPx: Int
 ): TextUnit {
-    if (text.isEmpty() || maxWidthPx <= 0) return 40.sp
+    if (text.isEmpty() || maxWidthPx <= 0 || maxHeightPx <= 0) return 40.sp
     val widthConstraints = Constraints(maxWidth = maxWidthPx)
-    for (sp in 40 downTo 14 step 2) {
+    
+    val fontSizes = (14..40 step 2).toList()
+    
+    var low = 0
+    var high = fontSizes.lastIndex
+    var bestFitIndex = 0 // Defaults to minimum size (14.sp)
+    
+    while (low <= high) {
+        val mid = (low + high) ushr 1
+        val size = fontSizes[mid]
+        
         val layout = textMeasurer.measure(
             text = text,
             style = TextStyle(
-                fontSize = sp.sp,
+                fontSize = size.sp,
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
                 textAlign = TextAlign.Center
             ),
             constraints = widthConstraints
         )
-        if (layout.size.height <= maxHeightPx) return sp.sp
+        
+        if (layout.size.height <= maxHeightPx) {
+            bestFitIndex = mid
+            low = mid + 1 // Fits! Try to find a larger fitting size
+        } else {
+            high = mid - 1 // Too tall. Look for a smaller size
+        }
     }
-    return 14.sp
+    
+    return fontSizes[bestFitIndex].sp
 }
 
 @Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 80)
