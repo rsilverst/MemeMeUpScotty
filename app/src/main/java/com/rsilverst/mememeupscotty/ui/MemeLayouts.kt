@@ -192,10 +192,14 @@ internal fun ExpandedLayout(
     activeFile: java.io.File?,
     onSelectFromHistory: (java.io.File) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
     Row(
         modifier = modifier
             .padding(horizontal = 20.dp, vertical = 8.dp)
-            .fillMaxSize(),
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusManager.clearFocus() })
+            },
         horizontalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Column(
