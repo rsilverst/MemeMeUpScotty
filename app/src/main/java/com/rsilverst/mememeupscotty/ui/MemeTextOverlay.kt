@@ -55,10 +55,14 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -194,7 +198,8 @@ internal fun MemeTextOverlay(
             } else {
                 with(density) { 96.dp.toPx() }.toInt()
             }
-            val displayText = value.ifEmpty { placeholder }
+            val displayedValue = if (style.allCaps) value.uppercase() else value
+            val displayText = displayedValue.ifEmpty { placeholder }
             val fontSize = remember(displayText, maxWidthPx, maxHeightPx, fontFamily, fontWeight) {
                 findBestFitFontSize(displayText, textMeasurer, fontFamily, fontWeight, maxWidthPx, maxHeightPx)
             }
@@ -211,15 +216,16 @@ internal fun MemeTextOverlay(
                 onValueChange = onValueChange,
                 textStyle = baseStyle.copy(color = fillColor),
                 cursorBrush = SolidColor(Plasma500),
+                visualTransformation = if (style.allCaps) UppercaseVisualTransformation else VisualTransformation.None,
                 modifier = Modifier
                     .focusRequester(focusRequester)
                     .onFocusChanged { hasFocus = it.isFocused },
                 decorationBox = { innerTextField ->
                     Box(contentAlignment = Alignment.Center) {
                         when {
-                            value.isNotEmpty() && style.outline -> {
+                            displayedValue.isNotEmpty() && style.outline -> {
                                 Text(
-                                    text = value,
+                                    text = displayedValue,
                                     style = baseStyle.copy(
                                         color = Color.Black,
                                         drawStyle = Stroke(
@@ -229,7 +235,7 @@ internal fun MemeTextOverlay(
                                     )
                                 )
                             }
-                            value.isEmpty() && !capturing -> {
+                            displayedValue.isEmpty() && !capturing -> {
                                 Text(
                                     text = placeholder,
                                     style = baseStyle.copy(
@@ -440,6 +446,15 @@ private fun findBestFitFontSize(
     }
     
     return fontSizes[bestFitIndex].sp
+}
+
+internal object UppercaseVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        return TransformedText(
+            text = AnnotatedString(text.text.uppercase()),
+            offsetMapping = OffsetMapping.Identity
+        )
+    }
 }
 
 @Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 80)

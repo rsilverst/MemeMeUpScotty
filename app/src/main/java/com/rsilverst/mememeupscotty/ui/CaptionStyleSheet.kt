@@ -119,6 +119,12 @@ internal fun CaptionStyleSheet(
                 outline = style.outline,
                 onChange = { onStyleChange(style.copy(outline = it)) }
             )
+
+            Spacer(Modifier.height(12.dp))
+            AllCapsRow(
+                allCaps = style.allCaps,
+                onChange = { onStyleChange(style.copy(allCaps = it)) }
+            )
         }
     }
 }
@@ -340,6 +346,40 @@ private fun OutlineRow(
         )
         Switch(
             checked = outline,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Space900,
+                checkedTrackColor = Plasma500,
+                uncheckedThumbColor = TextLow,
+                uncheckedTrackColor = Space600,
+                uncheckedBorderColor = Space500
+            )
+        )
+    }
+}
+
+@Composable
+private fun AllCapsRow(
+    allCaps: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Space800)
+            .border(1.dp, Space500, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.caption_style_all_caps),
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextHigh,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = allCaps,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Space900,

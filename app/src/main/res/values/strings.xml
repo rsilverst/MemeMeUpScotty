@@ -83,6 +83,7 @@
     <string name="caption_style_color">Color</string>
     <string name="caption_style_align">Align</string>
     <string name="caption_style_outline">Outline</string>
+    <string name="caption_style_all_caps">All caps</string>
     <string name="caption_font_impact">Impact</string>
     <string name="caption_font_sans">Sans</string>
     <string name="caption_font_serif">Serif</string>

@@ -36,5 +36,6 @@ internal data class CaptionStyle(
     val font: CaptionFont = CaptionFont.IMPACT,
     val fill: CaptionFill = CaptionFill.WHITE,
     val alignment: CaptionAlign = CaptionAlign.CENTER,
-    val outline: Boolean = true
+    val outline: Boolean = true,
+    val allCaps: Boolean = true
 )
