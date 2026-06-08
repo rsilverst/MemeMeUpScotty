@@ -3,6 +3,8 @@ package com.rsilverst.mememeupscotty
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
@@ -14,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -273,5 +276,66 @@ class MainViewModelTest {
         assertTrue(history[0].name.endsWith(second.name))
         assertEquals(tempHistoryDir, history[1].parentFile)
         assertTrue(history[1].name.endsWith(first.name))
+    }
+
+    @Test
+    fun init_capsMergedHistoryTo50Items() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val dataStore = FakeDataStore()
+        
+        // Seed datastore with 60 valid files that exist on disk
+        val files = (1..60).map { i ->
+            File(tempHistoryDir, "meme_$i.jpg").apply {
+                createNewFile()
+                deleteOnExit()
+            }
+        }
+        
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("history_paths")] = files.joinToString("\n") { it.name }
+        }
+        
+        val viewModel = createViewModel(mockRepository, dataStore = dataStore)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val history = viewModel.generationHistory.value
+        assertEquals(50, history.size)
+        // Verify we kept the first 50
+        assertEquals(files[0].name, history[0].name)
+        assertEquals(files[49].name, history[49].name)
+    }
+
+    @Test
+    fun init_savesHistoryWhenCurrentHistoryIsNotEmptyDuringMerge() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val dataStore = FakeDataStore()
+        
+        // Seed 5 existing files on disk
+        val existingFiles = (1..5).map { i ->
+            File(tempHistoryDir, "existing_$i.jpg").apply {
+                createNewFile()
+                deleteOnExit()
+            }
+        }
+        
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("history_paths")] = existingFiles.joinToString("\n") { it.name }
+        }
+        
+        val viewModel = createViewModel(mockRepository, dataStore = dataStore)
+        
+        val loadedFile = File.createTempFile("vm-temp-", ".img").apply { deleteOnExit() }
+        viewModel.setLoadedImage(loadedFile)
+        
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        // Verify that the datastore has the merged history (the loadedFile + the 5 existing files)
+        val raw = dataStore.data.first()[stringPreferencesKey("history_paths")] ?: ""
+        val savedNames = raw.split("\n").filter { it.isNotBlank() }
+        
+        assertTrue(savedNames.contains(loadedFile.name))
+        existingFiles.forEach { file ->
+            assertTrue(savedNames.contains(file.name))
+        }
     }
 }

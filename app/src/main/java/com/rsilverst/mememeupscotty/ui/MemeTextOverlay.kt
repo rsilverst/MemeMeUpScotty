@@ -450,8 +450,10 @@ private fun findBestFitFontSize(
 
 internal object UppercaseVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
+        // Use uppercaseChar() to guarantee a strict 1:1 length mapping for OffsetMapping.Identity
+        val uppercaseText = text.text.map { it.uppercaseChar() }.joinToString("")
         return TransformedText(
-            text = AnnotatedString(text.text.uppercase()),
+            text = AnnotatedString(uppercaseText),
             offsetMapping = OffsetMapping.Identity
         )
     }

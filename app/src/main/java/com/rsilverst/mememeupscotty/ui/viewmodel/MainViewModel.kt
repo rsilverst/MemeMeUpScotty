@@ -70,10 +70,22 @@ class MainViewModel(
                     .filter { it.isNotBlank() }
                     .map { File(historyDir, it) }
                     .filter { it.exists() }
-                _generationHistory.value = loaded
-                // Restore last active meme on canvas if history is not empty and state is Idle
-                if (loaded.isNotEmpty() && _generationState.value is GenerationState.Idle) {
-                    _generationState.value = GenerationState.Success(loaded.first())
+                withContext(Dispatchers.Main) {
+                    val currentHistory = _generationHistory.value
+                    val merged = (currentHistory + loaded).distinct().take(50)
+                    _generationHistory.value = merged
+
+                    if (currentHistory.isNotEmpty()) {
+                        viewModelScope.launch(ioDispatcher) {
+                            saveHistoryList(merged)
+                        }
+                    }
+
+                    if (currentHistory.isEmpty() && _generationState.value is GenerationState.Idle) {
+                        if (merged.isNotEmpty()) {
+                            _generationState.value = GenerationState.Success(merged.first())
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 logWarning(TAG, "Failed to load history list on startup", e)
