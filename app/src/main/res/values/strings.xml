@@ -75,6 +75,14 @@
     <!-- Generation history strip -->
     <string name="history_label">This session</string>
     <string name="history_thumb_content_description">Recent generation</string>
+    <string name="history_delete_title">Delete from history?</string>
+    <string name="history_delete_message">This will permanently remove this image from your local history.</string>
+    <string name="history_delete_confirm">Delete</string>
+    <string name="history_delete_cancel">Cancel</string>
+    <string name="history_clear_title">Clear all history?</string>
+    <string name="history_clear_message">This will permanently remove all generated and loaded images from your history.</string>
+    <string name="history_clear_confirm">Clear All</string>
+    <string name="history_clear_action">Clear</string>
 
     <!-- Caption styling -->
     <string name="edit_caption_style">Edit caption style</string>

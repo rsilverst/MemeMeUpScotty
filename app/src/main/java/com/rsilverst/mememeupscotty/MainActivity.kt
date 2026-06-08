@@ -1,11 +1,13 @@
 package com.rsilverst.mememeupscotty
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -19,8 +21,11 @@ import com.rsilverst.mememeupscotty.ui.theme.MemeMeUpScottyTheme
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 
 private const val TAG = "MainActivity"
+
+private val Context.historyDataStore by preferencesDataStore(name = "history_prefs")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,8 +49,9 @@ class MainActivity : ComponentActivity() {
         }
 
         val imageRepository: ImageRepository = ReplicateImageRepository(NetworkModule.replicateApi)
+        val historyDir = File(filesDir, "history").apply { mkdirs() }
         val factory = viewModelFactory {
-            initializer { MainViewModel(imageRepository) }
+            initializer { MainViewModel(imageRepository, historyDir, historyDataStore) }
         }
 
         setContent {

@@ -62,7 +62,9 @@ internal fun CompactLayout(
     onPickImage: () -> Unit,
     generationHistory: List<java.io.File>,
     activeFile: java.io.File?,
-    onSelectFromHistory: (java.io.File) -> Unit
+    onSelectFromHistory: (java.io.File) -> Unit,
+    onDeleteFromHistory: (java.io.File) -> Unit,
+    onClearAllHistory: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     Column(
@@ -124,12 +126,14 @@ internal fun CompactLayout(
             onPickImage = onPickImage
         )
 
-        if (generationHistory.size >= 2) {
+        if (generationHistory.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             HistoryStrip(
                 history = generationHistory,
                 selectedFile = activeFile,
-                onSelect = onSelectFromHistory
+                onSelect = onSelectFromHistory,
+                onDelete = onDeleteFromHistory,
+                onClearAll = onClearAllHistory
             )
         }
 
@@ -190,7 +194,9 @@ internal fun ExpandedLayout(
     onPickImage: () -> Unit,
     generationHistory: List<java.io.File>,
     activeFile: java.io.File?,
-    onSelectFromHistory: (java.io.File) -> Unit
+    onSelectFromHistory: (java.io.File) -> Unit,
+    onDeleteFromHistory: (java.io.File) -> Unit,
+    onClearAllHistory: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     Row(
@@ -228,12 +234,14 @@ internal fun ExpandedLayout(
                 onOpenModelPicker = onOpenModelPicker,
                 onReroll = onEnergize
             )
-            if (generationHistory.size >= 2) {
+            if (generationHistory.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 HistoryStrip(
                     history = generationHistory,
                     selectedFile = activeFile,
-                    onSelect = onSelectFromHistory
+                    onSelect = onSelectFromHistory,
+                    onDelete = onDeleteFromHistory,
+                    onClearAll = onClearAllHistory
                 )
             }
         }

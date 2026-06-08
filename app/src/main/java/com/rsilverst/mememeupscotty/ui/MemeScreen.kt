@@ -334,6 +334,14 @@ private fun MemeContent(
         )
     }
 
+    val onDeleteFromHistory: (java.io.File) -> Unit = { file ->
+        viewModel.deleteFromHistory(file)
+    }
+
+    val onClearAllHistory: () -> Unit = {
+        viewModel.clearAllHistory()
+    }
+
     if (isExpanded) {
         ExpandedLayout(
             modifier = modifier,
@@ -358,7 +366,9 @@ private fun MemeContent(
             onPickImage = onPickImage,
             generationHistory = generationHistory,
             activeFile = activeFile,
-            onSelectFromHistory = onSelectFromHistory
+            onSelectFromHistory = onSelectFromHistory,
+            onDeleteFromHistory = onDeleteFromHistory,
+            onClearAllHistory = onClearAllHistory
         )
     } else {
         CompactLayout(
@@ -384,7 +394,9 @@ private fun MemeContent(
             onPickImage = onPickImage,
             generationHistory = generationHistory,
             activeFile = activeFile,
-            onSelectFromHistory = onSelectFromHistory
+            onSelectFromHistory = onSelectFromHistory,
+            onDeleteFromHistory = onDeleteFromHistory,
+            onClearAllHistory = onClearAllHistory
         )
     }
 }
