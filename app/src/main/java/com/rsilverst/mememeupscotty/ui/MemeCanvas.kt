@@ -159,22 +159,6 @@ internal fun MemeCanvas(
             )
         }
 
-        // Persistent "Use a photo" affordance pinned to the canvas
-        // top-right. Visible in every canvas state — idle (primary
-        // discoverability), loading, success (acts as "replace"), and
-        // error — and fades only during capture so it never leaks into
-        // a saved/shared bitmap.
-        AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(160)),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-        ) {
-            PhotoSourceChip(onClick = onPickImage)
-        }
-
         // Captions only make sense once there's an image to put them on.
         if (generationState is GenerationState.Success) {
             if (topVisible) {
@@ -254,6 +238,22 @@ internal fun MemeCanvas(
                         .padding(bottom = 12.dp)
                 )
             }
+        }
+
+        // Persistent "Use a photo" affordance pinned to the canvas
+        // top-right. Visible in every canvas state — idle (primary
+        // discoverability), loading, success (acts as "replace"), and
+        // error — and fades only during capture so it never leaks into
+        // a saved/shared bitmap.
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(160)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        ) {
+            PhotoSourceChip(onClick = onPickImage)
         }
     }
 
