@@ -15,10 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.outlined.FormatAlignRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.FormatAlignCenter
-import androidx.compose.material.icons.outlined.FormatAlignLeft
-import androidx.compose.material.icons.outlined.FormatAlignRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +36,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rsilverst.mememeupscotty.R
@@ -272,7 +271,7 @@ private fun AlignRow(
         modifier = Modifier.fillMaxWidth()
     ) {
         AlignButton(
-            icon = Icons.Outlined.FormatAlignLeft,
+            icon = Icons.AutoMirrored.Outlined.FormatAlignLeft,
             label = stringResource(R.string.caption_align_left),
             isSelected = selected == CaptionAlign.LEFT,
             onClick = { onSelect(CaptionAlign.LEFT) },
@@ -286,7 +285,7 @@ private fun AlignRow(
             modifier = Modifier.weight(1f)
         )
         AlignButton(
-            icon = Icons.Outlined.FormatAlignRight,
+            icon = Icons.AutoMirrored.Outlined.FormatAlignRight,
             label = stringResource(R.string.caption_align_right),
             isSelected = selected == CaptionAlign.RIGHT,
             onClick = { onSelect(CaptionAlign.RIGHT) },

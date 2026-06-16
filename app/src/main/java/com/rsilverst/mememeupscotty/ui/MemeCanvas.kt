@@ -85,6 +85,7 @@ import com.rsilverst.mememeupscotty.ui.theme.TextMid
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import kotlinx.coroutines.delay
 import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
 
 // Square canvas containing the active state (idle / loading / image / error)
 // plus the two caption overlays. Records itself into the supplied graphics
@@ -440,7 +441,7 @@ private fun LoadingState() {
     var elapsedSec by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(1000)
+            delay(1000.milliseconds)
             elapsedSec++
         }
     }
