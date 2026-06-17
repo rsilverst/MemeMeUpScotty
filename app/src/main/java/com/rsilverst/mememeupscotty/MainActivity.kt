@@ -1,13 +1,10 @@
 package com.rsilverst.mememeupscotty
-
-import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -24,8 +21,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private const val TAG = "MainActivity"
-
-private val Context.historyDataStore by preferencesDataStore(name = "history_prefs")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

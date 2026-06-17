@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Meme Me Up, Scotty</string>
+    <string name="app_description">Generates high-quality base images for custom memes using advanced AI models like Juggernaut XL, SDXL, and Flux.</string>
 
     <!-- Prompt -->
     <string name="prompt_placeholder">Describe your meme&#8230;</string>

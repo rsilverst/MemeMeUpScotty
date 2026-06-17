@@ -17,7 +17,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -63,32 +62,27 @@ class MainViewModel(
 
     init {
         viewModelScope.launch(ioDispatcher) {
-            try {
-                val preferences = dataStore.data.first()
-                val raw = preferences[HISTORY_KEY] ?: ""
-                val loaded = raw.split("\n")
-                    .filter { it.isNotBlank() }
-                    .map { File(historyDir, it) }
-                    .filter { it.exists() }
-                withContext(Dispatchers.Main) {
-                    val currentHistory = _generationHistory.value
-                    val merged = (currentHistory + loaded).distinct().take(50)
-                    _generationHistory.value = merged
+            var isFirstLoad = true
+            dataStore.data.collect { preferences ->
+                try {
+                    val raw = preferences[HISTORY_KEY] ?: ""
+                    val loaded = raw.split("\n")
+                        .filter { it.isNotBlank() }
+                        .map { File(historyDir, it) }
+                        .filter { it.exists() }
+                    withContext(Dispatchers.Main) {
+                        _generationHistory.value = loaded
 
-                    if (currentHistory.isNotEmpty()) {
-                        viewModelScope.launch(ioDispatcher) {
-                            saveHistoryList(merged)
+                        if (isFirstLoad) {
+                            isFirstLoad = false
+                            if (_generationState.value is GenerationState.Idle && loaded.isNotEmpty()) {
+                                _generationState.value = GenerationState.Success(loaded.first())
+                            }
                         }
                     }
-
-                    if (currentHistory.isEmpty() && _generationState.value is GenerationState.Idle) {
-                        if (merged.isNotEmpty()) {
-                            _generationState.value = GenerationState.Success(merged.first())
-                        }
-                    }
+                } catch (e: Exception) {
+                    logWarning(TAG, "Failed to load history list updates", e)
                 }
-            } catch (e: Exception) {
-                logWarning(TAG, "Failed to load history list on startup", e)
             }
         }
     }
