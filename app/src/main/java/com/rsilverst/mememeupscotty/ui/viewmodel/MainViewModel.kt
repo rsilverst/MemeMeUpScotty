@@ -60,6 +60,8 @@ class MainViewModel(
     // Tracks the in-flight generation coroutine so it can be cancelled
     private var generationJob: Job? = null
 
+    private var isHistoryLoaded = false
+
     init {
         viewModelScope.launch(ioDispatcher) {
             var isFirstLoad = true
@@ -71,12 +73,29 @@ class MainViewModel(
                         .map { File(historyDir, it) }
                         .filter { it.exists() }
                     withContext(Dispatchers.Main) {
-                        _generationHistory.value = loaded
-
                         if (isFirstLoad) {
                             isFirstLoad = false
-                            if (_generationState.value is GenerationState.Idle && loaded.isNotEmpty()) {
-                                _generationState.value = GenerationState.Success(loaded.first())
+                            val currentHistory = _generationHistory.value
+                            val merged = (currentHistory + loaded).distinct().take(50)
+                            _generationHistory.value = merged
+                            isHistoryLoaded = true
+
+                            if (currentHistory.isNotEmpty() || loaded.size > 50) {
+                                viewModelScope.launch(ioDispatcher) {
+                                    saveHistoryList(merged)
+                                }
+                            }
+
+                            if (currentHistory.isEmpty() && _generationState.value is GenerationState.Idle) {
+                                if (merged.isNotEmpty()) {
+                                    _generationState.value = GenerationState.Success(merged.first())
+                                }
+                            }
+                        } else {
+                            val current = _generationHistory.value
+                            val capped = loaded.take(50)
+                            if (current != capped) {
+                                _generationHistory.value = capped
                             }
                         }
                     }
@@ -240,7 +259,9 @@ class MainViewModel(
         val currentList = _generationHistory.value.filter { it != file }
         val newList = listOf(file) + currentList
 
-        if (newList.size > 50) {
+        _generationHistory.value = newList
+
+        if (isHistoryLoaded) {
             val toKeep = newList.take(50)
             val toDelete = newList.drop(50)
             viewModelScope.launch(ioDispatcher) {
@@ -256,11 +277,6 @@ class MainViewModel(
                 }
             }
             _generationHistory.value = toKeep
-        } else {
-            viewModelScope.launch(ioDispatcher) {
-                saveHistoryList(newList)
-            }
-            _generationHistory.value = newList
         }
     }
 

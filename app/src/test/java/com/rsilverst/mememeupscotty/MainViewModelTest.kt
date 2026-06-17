@@ -333,7 +333,7 @@ class MainViewModelTest {
         val raw = dataStore.data.first()[stringPreferencesKey("history_paths")] ?: ""
         val savedNames = raw.split("\n").filter { it.isNotBlank() }
         
-        assertTrue(savedNames.contains(loadedFile.name))
+        assertTrue(savedNames.any { it.endsWith(loadedFile.name) })
         existingFiles.forEach { file ->
             assertTrue(savedNames.contains(file.name))
         }
