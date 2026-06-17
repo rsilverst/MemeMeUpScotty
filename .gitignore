@@ -23,3 +23,5 @@ build/
 # Signing material
 *.jks
 *.keystore
+/UX_REVIEW.md
+/CODE_REVIEW.md
