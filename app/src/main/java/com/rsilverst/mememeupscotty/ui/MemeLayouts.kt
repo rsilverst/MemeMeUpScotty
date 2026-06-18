@@ -96,9 +96,7 @@ internal fun CompactLayout(
 
         HudStrip(
             selectedModel = selectedModel,
-            generationState = generationState,
-            onOpenModelPicker = onOpenModelPicker,
-            onReroll = onEnergize
+            onOpenModelPicker = onOpenModelPicker
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -224,9 +222,7 @@ internal fun ExpandedLayout(
             Spacer(Modifier.height(20.dp))
             HudStrip(
                 selectedModel = selectedModel,
-                generationState = generationState,
-                onOpenModelPicker = onOpenModelPicker,
-                onReroll = onEnergize
+                onOpenModelPicker = onOpenModelPicker
             )
             if (generationHistory.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))

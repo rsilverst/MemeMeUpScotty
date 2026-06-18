@@ -21,7 +21,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
@@ -70,11 +69,8 @@ import java.io.File
 @Composable
 internal fun HudStrip(
     selectedModel: ImageModel,
-    generationState: GenerationState,
-    onOpenModelPicker: () -> Unit,
-    onReroll: () -> Unit
+    onOpenModelPicker: () -> Unit
 ) {
-    val isLoading = generationState is GenerationState.Loading
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,39 +115,6 @@ internal fun HudStrip(
                 text = stringResource(R.string.hud_tap_to_change),
                 style = MaterialTheme.typography.labelMedium,
                 color = TextLow
-            )
-        }
-
-        HudIconButton(
-            icon = Icons.Filled.Casino,
-            contentDescription = stringResource(R.string.hud_reroll),
-            enabled = !isLoading,
-            onClick = onReroll
-        )
-    }
-}
-
-@Composable
-private fun HudIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(8.dp),
-        color = Color.White.copy(alpha = 0.04f),
-        contentColor = if (enabled) TextMid else TextLow,
-        border = BorderStroke(1.dp, Space500),
-        modifier = Modifier.size(32.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -321,9 +284,7 @@ private fun HudStripPreview() {
     PreviewShell {
         HudStrip(
             selectedModel = ImageModel.JUGGERNAUT,
-            generationState = GenerationState.Success(File("")),
-            onOpenModelPicker = {},
-            onReroll = {}
+            onOpenModelPicker = {}
         )
     }
 }

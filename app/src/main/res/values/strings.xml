@@ -127,7 +127,6 @@
     <string name="model_proteus_desc">Painterly, fine-art texture.</string>
 
     <!-- HUD -->
-    <string name="hud_reroll">Re-roll seed (regenerate)</string>
     <string name="hud_tap_to_change">tap to change</string>
 
     <!-- Expanded layout field labels -->
