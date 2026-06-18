@@ -10,13 +10,20 @@ import androidx.lifecycle.viewModelScope
 import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.data.repository.GenerationOutcome
 import com.rsilverst.mememeupscotty.data.repository.ImageRepository
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -53,12 +60,25 @@ class MainViewModel(
     private val _selectedModel = MutableStateFlow(ImageModel.JUGGERNAUT)
     val selectedModel: StateFlow<ImageModel> = _selectedModel.asStateFlow()
 
-    // Persistent history of every image loaded onto the canvas
-    private val _generationHistory = MutableStateFlow<List<File>>(emptyList())
-    val generationHistory: StateFlow<List<File>> = _generationHistory.asStateFlow()
+    // Persistent history of every image loaded onto the canvas, each carrying
+    // its provenance (prompt / model / seed) and its editable captions.
+    private val _generationHistory = MutableStateFlow<List<HistoryEntry>>(emptyList())
+    val generationHistory: StateFlow<List<HistoryEntry>> = _generationHistory.asStateFlow()
+
+    // The entry currently shown on the canvas, derived from which Success file
+    // is active. The UI reads its captions (live), prompt, and provenance from
+    // here. Null in Idle / Loading / Error.
+    val activeEntry: StateFlow<HistoryEntry?> =
+        combine(_generationHistory, _generationState) { history, state ->
+            val file = (state as? GenerationState.Success)?.imageFile
+            history.firstOrNull { it.file == file }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // Tracks the in-flight generation coroutine so it can be cancelled
     private var generationJob: Job? = null
+
+    // Debounced writer for live caption edits to the active image.
+    private var captionPersistJob: Job? = null
 
     private var isHistoryLoaded = false
 
@@ -67,16 +87,16 @@ class MainViewModel(
             var isFirstLoad = true
             dataStore.data.collect { preferences ->
                 try {
-                    val raw = preferences[HISTORY_KEY] ?: ""
-                    val loaded = raw.split("\n")
-                        .filter { it.isNotBlank() }
-                        .map { File(historyDir, it) }
-                        .filter { it.exists() }
+                    val loaded = readHistory(preferences)
                     withContext(Dispatchers.Main) {
                         if (isFirstLoad) {
                             isFirstLoad = false
                             val currentHistory = _generationHistory.value
-                            val merged = (currentHistory + loaded).distinct().take(50)
+                            // currentHistory first so its (live, possibly newer)
+                            // captions win over the persisted copy on dedupe.
+                            val merged = (currentHistory + loaded)
+                                .distinctBy { it.file }
+                                .take(50)
                             _generationHistory.value = merged
                             isHistoryLoaded = true
 
@@ -88,14 +108,19 @@ class MainViewModel(
 
                             if (currentHistory.isEmpty() && _generationState.value is GenerationState.Idle) {
                                 if (merged.isNotEmpty()) {
-                                    _generationState.value = GenerationState.Success(merged.first())
+                                    _generationState.value = GenerationState.Success(merged.first().file)
                                 }
                             }
                         } else {
+                            // In-memory state is authoritative (all writes go
+                            // through this VM), so never clobber live captions —
+                            // only fold in entries that appeared on disk and
+                            // aren't already tracked.
                             val current = _generationHistory.value
-                            val capped = loaded.take(50)
-                            if (current != capped) {
-                                _generationHistory.value = capped
+                            val currentFiles = current.mapTo(HashSet()) { it.file }
+                            val newFromDisk = loaded.filter { it.file !in currentFiles }
+                            if (newFromDisk.isNotEmpty()) {
+                                _generationHistory.value = (current + newFromDisk).take(50)
                             }
                         }
                     }
@@ -110,6 +135,32 @@ class MainViewModel(
         _selectedModel.value = model
     }
 
+    // Live-edit the captions of the currently active image. The transform is
+    // applied to the freshest snapshot read from the list (not a snapshot
+    // captured at composition time), so a deferred edit — e.g. the undo action
+    // on a delete-caption snackbar — never clobbers concurrent edits to the
+    // other caption. Updated in memory on every keystroke / drag (cheap,
+    // re-emits the list); the write to DataStore is debounced so we don't hit
+    // disk on every pixel but still survive a background-kill, and onCleared
+    // flushes the very last edits synchronously.
+    fun editActiveCaptions(transform: (CaptionSnapshot) -> CaptionSnapshot) {
+        val activeFile = (_generationState.value as? GenerationState.Success)?.imageFile ?: return
+        _generationHistory.value = _generationHistory.value.map {
+            if (it.file == activeFile) it.copy(captions = transform(it.captions)) else it
+        }
+        scheduleCaptionPersist()
+    }
+
+    // Coalesce a burst of caption edits into a single write a short time after
+    // the user stops editing.
+    private fun scheduleCaptionPersist() {
+        captionPersistJob?.cancel()
+        captionPersistJob = viewModelScope.launch(ioDispatcher) {
+            delay(CAPTION_PERSIST_DEBOUNCE_MS)
+            saveHistoryList(_generationHistory.value)
+        }
+    }
+
     // Swap the canvas image to one the caller has already materialised on
     // disk (e.g. a copy of a gallery URI) and add it to the history strip.
     fun setLoadedImage(file: File) {
@@ -119,26 +170,34 @@ class MainViewModel(
         viewModelScope.launch(ioDispatcher) {
             persistFileOnDisk(file, persistedFile)
             withContext(Dispatchers.Main) {
-                appendToHistory(persistedFile)
+                appendToHistory(HistoryEntry(persistedFile))
                 _generationState.value = GenerationState.Success(persistedFile)
             }
         }
     }
 
-    // User tapped a thumbnail in the history strip. Just flips active —
-    // doesn't re-add to history (the file is already there).
+    // User tapped a thumbnail in the history strip. Flips the active image and
+    // restores the model that produced it; the UI restores the prompt from the
+    // entry. Captions ride along with the entry, still fully editable. Persists
+    // so any caption edits to the entry we're leaving are written to disk.
     fun selectFromHistory(file: File) {
         _generationState.value = GenerationState.Success(file)
+        val entry = _generationHistory.value.firstOrNull { it.file == file }
+        entry?.modelId?.let { id ->
+            ImageModel.entries.firstOrNull { it.id == id }?.let { _selectedModel.value = it }
+        }
+        viewModelScope.launch(ioDispatcher) { saveHistoryList(_generationHistory.value) }
     }
 
     fun generateImage(prompt: String, cacheDir: File) {
         // Cancel any in-flight attempt so a rapid second tap (or a re-roll
         // mid-generation) doesn't race with the previous one.
         generationJob?.cancel()
+        val modelId = _selectedModel.value.id
         generationJob = viewModelScope.launch {
             _generationState.value = GenerationState.Loading
             try {
-                val outcome = imageRepository.generateImage(_selectedModel.value.id, prompt, cacheDir)
+                val outcome = imageRepository.generateImage(modelId, prompt, cacheDir)
                 when (outcome) {
                     is GenerationOutcome.Success -> {
                         val persistedFile = getPersistedFileTarget(outcome.file)
@@ -147,7 +206,14 @@ class MainViewModel(
                         viewModelScope.launch(ioDispatcher) {
                             persistFileOnDisk(outcome.file, persistedFile)
                             withContext(Dispatchers.Main) {
-                                appendToHistory(persistedFile)
+                                appendToHistory(
+                                    HistoryEntry(
+                                        file = persistedFile,
+                                        prompt = prompt,
+                                        modelId = modelId,
+                                        seed = outcome.seed
+                                    )
+                                )
                                 _generationState.value = GenerationState.Success(persistedFile)
                             }
                         }
@@ -171,7 +237,7 @@ class MainViewModel(
     }
 
     fun deleteFromHistory(file: File) {
-        val newList = _generationHistory.value.filter { it != file }
+        val newList = _generationHistory.value.filter { it.file != file }
         _generationHistory.value = newList
 
         viewModelScope.launch(ioDispatcher) {
@@ -188,7 +254,7 @@ class MainViewModel(
         val activeState = _generationState.value
         if (activeState is GenerationState.Success && activeState.imageFile == file) {
             if (newList.isNotEmpty()) {
-                _generationState.value = GenerationState.Success(newList.first())
+                _generationState.value = GenerationState.Success(newList.first().file)
             } else {
                 _generationState.value = GenerationState.Idle
             }
@@ -202,8 +268,9 @@ class MainViewModel(
 
         viewModelScope.launch(ioDispatcher) {
             saveHistoryList(emptyList())
-            currentList.forEach { file ->
+            currentList.forEach { entry ->
                 try {
+                    val file = entry.file
                     if (file.exists() && file.parentFile == historyDir) {
                         file.delete()
                     }
@@ -212,6 +279,16 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // viewModelScope is already cancelled by the time onCleared runs, so a
+        // launch{} here would never execute. Flush the latest caption edits
+        // synchronously instead — the payload is tiny, so the brief block on
+        // teardown is negligible, and it guarantees the on-screen state is what
+        // we reopen to.
+        runBlocking { saveHistoryList(_generationHistory.value) }
     }
 
     private fun getPersistedFileTarget(file: File): File {
@@ -253,11 +330,11 @@ class MainViewModel(
         }
     }
 
-    private fun appendToHistory(file: File) {
+    private fun appendToHistory(entry: HistoryEntry) {
         // Most-recent at index 0 so the strip's leftmost slot is always the
         // newest. If the same file is somehow re-added, drop the existing reference.
-        val currentList = _generationHistory.value.filter { it != file }
-        val newList = listOf(file) + currentList
+        val currentList = _generationHistory.value.filter { it.file != entry.file }
+        val newList = listOf(entry) + currentList
 
         _generationHistory.value = newList
 
@@ -266,8 +343,9 @@ class MainViewModel(
             val toDelete = newList.drop(50)
             viewModelScope.launch(ioDispatcher) {
                 saveHistoryList(toKeep)
-                toDelete.forEach { oldFile ->
+                toDelete.forEach { evicted ->
                     try {
+                        val oldFile = evicted.file
                         if (oldFile.exists() && oldFile.parentFile == historyDir) {
                             oldFile.delete()
                         }
@@ -280,10 +358,34 @@ class MainViewModel(
         }
     }
 
-    private suspend fun saveHistoryList(list: List<File>) {
+    // Reads the persisted history. Prefers the JSON entry format (provenance +
+    // captions); falls back to the legacy newline-joined filename list so a
+    // history written by an older build still loads (as entries with no
+    // provenance and default captions). Either way, drops entries whose backing
+    // file no longer exists on disk.
+    private fun readHistory(preferences: Preferences): List<HistoryEntry> {
+        val json = preferences[HISTORY_ENTRIES_KEY]
+        if (!json.isNullOrBlank()) {
+            val dtos = try {
+                historyAdapter.fromJson(json) ?: emptyList()
+            } catch (e: Exception) {
+                logWarning(TAG, "Failed to parse history JSON; ignoring", e)
+                emptyList()
+            }
+            return dtos.map { it.toEntry(historyDir) }.filter { it.file.exists() }
+        }
+        val raw = preferences[HISTORY_KEY] ?: ""
+        return raw.split("\n")
+            .filter { it.isNotBlank() }
+            .map { HistoryEntry(File(historyDir, it)) }
+            .filter { it.file.exists() }
+    }
+
+    private suspend fun saveHistoryList(list: List<HistoryEntry>) {
         try {
+            val json = historyAdapter.toJson(list.map { it.toDto() })
             dataStore.edit { preferences ->
-                preferences[HISTORY_KEY] = list.joinToString("\n") { it.name }
+                preferences[HISTORY_ENTRIES_KEY] = json
             }
         } catch (e: Exception) {
             logWarning(TAG, "Failed to save history index to DataStore", e)
@@ -300,6 +402,20 @@ class MainViewModel(
 
     companion object {
         private const val TAG = "MainViewModel"
+
+        // Wait this long after the last caption edit before writing to disk.
+        private const val CAPTION_PERSIST_DEBOUNCE_MS = 400L
+
+        // Legacy key: newline-joined file names, no provenance / captions.
         private val HISTORY_KEY = stringPreferencesKey("history_paths")
+
+        // Current key: JSON array of HistoryEntryDto.
+        private val HISTORY_ENTRIES_KEY = stringPreferencesKey("history_entries")
+
+        private val historyAdapter by lazy {
+            val moshi = Moshi.Builder().build()
+            val type = Types.newParameterizedType(List::class.java, HistoryEntryDto::class.java)
+            moshi.adapter<List<HistoryEntryDto>>(type)
+        }
     }
 }

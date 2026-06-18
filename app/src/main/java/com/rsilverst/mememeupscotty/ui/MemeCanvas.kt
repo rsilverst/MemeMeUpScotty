@@ -82,6 +82,7 @@ import com.rsilverst.mememeupscotty.ui.theme.Space900
 import com.rsilverst.mememeupscotty.ui.theme.TextHigh
 import com.rsilverst.mememeupscotty.ui.theme.TextLow
 import com.rsilverst.mememeupscotty.ui.theme.TextMid
+import com.rsilverst.mememeupscotty.ui.viewmodel.CaptionSnapshot
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import kotlinx.coroutines.delay
 import kotlin.math.sin
@@ -95,10 +96,8 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 internal fun MemeCanvas(
     generationState: GenerationState,
-    topText: String,
-    onTopTextChange: (String) -> Unit,
-    bottomText: String,
-    onBottomTextChange: (String) -> Unit,
+    captions: CaptionSnapshot,
+    onCaptionsChange: ((CaptionSnapshot) -> CaptionSnapshot) -> Unit,
     capturing: Boolean,
     graphicsLayer: GraphicsLayer,
     onPromptChip: (String) -> Unit,
@@ -107,17 +106,20 @@ internal fun MemeCanvas(
     onPickImage: () -> Unit = {},
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
-    var topVisible by remember { mutableStateOf(true) }
-    var bottomVisible by remember { mutableStateOf(true) }
-    var topOffset by remember { mutableStateOf(Offset.Zero) }
-    var bottomOffset by remember { mutableStateOf(Offset.Zero) }
-    var topSize by remember { mutableStateOf<Size?>(null) }
-    var bottomSize by remember { mutableStateOf<Size?>(null) }
-    var topStyle by remember { mutableStateOf(CaptionStyle()) }
-    var bottomStyle by remember { mutableStateOf(CaptionStyle()) }
+    val top = captions.top
+    val bottom = captions.bottom
     var styleSheetTarget by remember { mutableStateOf<CaptionTarget?>(null) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val showControls = !capturing
+
+    // Every caption edit also records the current (square) canvas side so other
+    // surfaces — the history thumbnails — can place the captions proportionally.
+    val editCaptions: ((CaptionSnapshot) -> CaptionSnapshot) -> Unit = { transform ->
+        onCaptionsChange { snap ->
+            val stamped = if (canvasSize.width > 0) snap.copy(refSize = canvasSize.width.toFloat()) else snap
+            transform(stamped)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -162,28 +164,25 @@ internal fun MemeCanvas(
 
         // Captions only make sense once there's an image to put them on.
         if (generationState is GenerationState.Success) {
-            if (topVisible) {
+            if (top.visible) {
                 MemeTextOverlay(
-                    value = topText,
-                    onValueChange = onTopTextChange,
+                    value = top.text,
+                    onValueChange = { v -> editCaptions { it.copy(top = it.top.copy(text = v)) } },
                     placeholder = stringResource(R.string.default_top_text),
-                    offset = topOffset,
-                    onOffsetChange = { topOffset = it },
-                    size = topSize,
-                    onSizeChange = { topSize = it },
-                    style = topStyle,
+                    offset = top.toOffset(),
+                    onOffsetChange = { o -> editCaptions { it.copy(top = it.top.withOffset(o)) } },
+                    size = top.toSize(),
+                    onSizeChange = { s -> editCaptions { it.copy(top = it.top.withSize(s)) } },
+                    style = top.toStyle(),
                     capturing = capturing,
                     parentSize = canvasSize,
                     onDelete = {
-                        val restoreOffset = topOffset
-                        val restoreSize = topSize
-                        topVisible = false
-                        topOffset = Offset.Zero
-                        topSize = null
+                        val restore = top
+                        onCaptionsChange {
+                            it.copy(top = it.top.copy(visible = false, offsetX = 0f, offsetY = 0f, width = null, height = null))
+                        }
                         onCaptionDeleted {
-                            topVisible = true
-                            topOffset = restoreOffset
-                            topSize = restoreSize
+                            editCaptions { it.copy(top = restore) }
                         }
                     },
                     onOpenStyleSheet = { styleSheetTarget = CaptionTarget.TOP },
@@ -193,7 +192,7 @@ internal fun MemeCanvas(
                 )
             } else if (showControls) {
                 AddTextPill(
-                    onClick = { topVisible = true },
+                    onClick = { editCaptions { it.copy(top = it.top.copy(visible = true)) } },
                     label = stringResource(R.string.add_top_text),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -201,28 +200,25 @@ internal fun MemeCanvas(
                 )
             }
 
-            if (bottomVisible) {
+            if (bottom.visible) {
                 MemeTextOverlay(
-                    value = bottomText,
-                    onValueChange = onBottomTextChange,
+                    value = bottom.text,
+                    onValueChange = { v -> editCaptions { it.copy(bottom = it.bottom.copy(text = v)) } },
                     placeholder = stringResource(R.string.default_bottom_text),
-                    offset = bottomOffset,
-                    onOffsetChange = { bottomOffset = it },
-                    size = bottomSize,
-                    onSizeChange = { bottomSize = it },
-                    style = bottomStyle,
+                    offset = bottom.toOffset(),
+                    onOffsetChange = { o -> editCaptions { it.copy(bottom = it.bottom.withOffset(o)) } },
+                    size = bottom.toSize(),
+                    onSizeChange = { s -> editCaptions { it.copy(bottom = it.bottom.withSize(s)) } },
+                    style = bottom.toStyle(),
                     capturing = capturing,
                     parentSize = canvasSize,
                     onDelete = {
-                        val restoreOffset = bottomOffset
-                        val restoreSize = bottomSize
-                        bottomVisible = false
-                        bottomOffset = Offset.Zero
-                        bottomSize = null
+                        val restore = bottom
+                        onCaptionsChange {
+                            it.copy(bottom = it.bottom.copy(visible = false, offsetX = 0f, offsetY = 0f, width = null, height = null))
+                        }
                         onCaptionDeleted {
-                            bottomVisible = true
-                            bottomOffset = restoreOffset
-                            bottomSize = restoreSize
+                            editCaptions { it.copy(bottom = restore) }
                         }
                     },
                     onOpenStyleSheet = { styleSheetTarget = CaptionTarget.BOTTOM },
@@ -232,7 +228,7 @@ internal fun MemeCanvas(
                 )
             } else if (showControls) {
                 AddTextPill(
-                    onClick = { bottomVisible = true },
+                    onClick = { editCaptions { it.copy(bottom = it.bottom.copy(visible = true)) } },
                     label = stringResource(R.string.add_bottom_text),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -260,13 +256,13 @@ internal fun MemeCanvas(
 
     when (styleSheetTarget) {
         CaptionTarget.TOP -> CaptionStyleSheet(
-            style = topStyle,
-            onStyleChange = { topStyle = it },
+            style = top.toStyle(),
+            onStyleChange = { s -> editCaptions { it.copy(top = it.top.withStyle(s)) } },
             onDismiss = { styleSheetTarget = null }
         )
         CaptionTarget.BOTTOM -> CaptionStyleSheet(
-            style = bottomStyle,
-            onStyleChange = { bottomStyle = it },
+            style = bottom.toStyle(),
+            onStyleChange = { s -> editCaptions { it.copy(bottom = it.bottom.withStyle(s)) } },
             onDismiss = { styleSheetTarget = null }
         )
         null -> Unit

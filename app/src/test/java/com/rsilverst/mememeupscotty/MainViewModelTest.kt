@@ -198,10 +198,10 @@ class MainViewModelTest {
         // Most-recent at index 0.
         val history = viewModel.generationHistory.value
         assertEquals(2, history.size)
-        assertEquals(tempHistoryDir, history[0].parentFile)
-        assertEquals(tempHistoryDir, history[1].parentFile)
-        assertTrue(history[0].name.endsWith(second.name))
-        assertTrue(history[1].name.endsWith(first.name))
+        assertEquals(tempHistoryDir, history[0].file.parentFile)
+        assertEquals(tempHistoryDir, history[1].file.parentFile)
+        assertTrue(history[0].file.name.endsWith(second.name))
+        assertTrue(history[1].file.name.endsWith(first.name))
     }
 
     @Test
@@ -215,7 +215,7 @@ class MainViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         val historyBefore = viewModel.generationHistory.value
         assertEquals(2, historyBefore.size)
-        val firstPersisted = historyBefore[1]
+        val firstPersisted = historyBefore[1].file
 
         viewModel.selectFromHistory(firstPersisted)
 
@@ -268,14 +268,14 @@ class MainViewModelTest {
 
         assertTrue("previously loaded file should still be on disk", first.exists())
         val state = viewModel.generationState.value as GenerationState.Success
-        
+
         val history = viewModel.generationHistory.value
         assertEquals(2, history.size)
-        assertEquals(state.imageFile, history[0])
-        assertEquals(tempHistoryDir, history[0].parentFile)
-        assertTrue(history[0].name.endsWith(second.name))
-        assertEquals(tempHistoryDir, history[1].parentFile)
-        assertTrue(history[1].name.endsWith(first.name))
+        assertEquals(state.imageFile, history[0].file)
+        assertEquals(tempHistoryDir, history[0].file.parentFile)
+        assertTrue(history[0].file.name.endsWith(second.name))
+        assertEquals(tempHistoryDir, history[1].file.parentFile)
+        assertTrue(history[1].file.name.endsWith(first.name))
     }
 
     @Test
@@ -301,8 +301,8 @@ class MainViewModelTest {
         val history = viewModel.generationHistory.value
         assertEquals(50, history.size)
         // Verify we kept the first 50
-        assertEquals(files[0].name, history[0].name)
-        assertEquals(files[49].name, history[49].name)
+        assertEquals(files[0].name, history[0].file.name)
+        assertEquals(files[49].name, history[49].file.name)
     }
 
     @Test
@@ -328,14 +328,98 @@ class MainViewModelTest {
         viewModel.setLoadedImage(loadedFile)
         
         testDispatcher.scheduler.advanceUntilIdle()
-        
-        // Verify that the datastore has the merged history (the loadedFile + the 5 existing files)
-        val raw = dataStore.data.first()[stringPreferencesKey("history_paths")] ?: ""
-        val savedNames = raw.split("\n").filter { it.isNotBlank() }
-        
-        assertTrue(savedNames.any { it.endsWith(loadedFile.name) })
+
+        // Verify that the datastore persisted the merged history (the loadedFile
+        // + the 5 existing files) under the JSON entries key. We assert against
+        // the raw JSON (which embeds each "file":"<name>") to avoid pulling a
+        // Moshi adapter into the test.
+        val savedJson = dataStore.data.first()[stringPreferencesKey("history_entries")] ?: ""
+        assertTrue("loaded file should be persisted", savedJson.contains(loadedFile.name))
         existingFiles.forEach { file ->
-            assertTrue(savedNames.contains(file.name))
+            assertTrue("existing file ${file.name} should be persisted", savedJson.contains(file.name))
         }
+    }
+
+    @Test
+    fun editActiveCaptions_areKeptPerEntry_andTravelOnHistorySwitch() = runTest(testDispatcher) {
+        val viewModel = createViewModel(MockImageRepository())
+        val first = File.createTempFile("cap-first-", ".img").apply { deleteOnExit() }
+        val second = File.createTempFile("cap-second-", ".img").apply { deleteOnExit() }
+
+        viewModel.setLoadedImage(first)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.editActiveCaptions { it.copy(top = it.top.copy(text = "FIRST TOP")) }
+
+        viewModel.setLoadedImage(second)
+        testDispatcher.scheduler.advanceUntilIdle()
+        // A freshly loaded image starts with its own (empty) captions.
+        assertEquals("", viewModel.activeEntry.value?.captions?.top?.text)
+        viewModel.editActiveCaptions { it.copy(bottom = it.bottom.copy(text = "SECOND BOTTOM")) }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Switch back to the first image — its caption is still there, as
+        // editable text (not baked), and the second image's is untouched.
+        val firstFile = viewModel.generationHistory.value.first { it.file.name.endsWith(first.name) }.file
+        viewModel.selectFromHistory(firstFile)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("FIRST TOP", viewModel.activeEntry.value?.captions?.top?.text)
+        assertEquals("", viewModel.activeEntry.value?.captions?.bottom?.text)
+
+        val secondFile = viewModel.generationHistory.value.first { it.file.name.endsWith(second.name) }.file
+        viewModel.selectFromHistory(secondFile)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("SECOND BOTTOM", viewModel.activeEntry.value?.captions?.bottom?.text)
+        assertEquals("", viewModel.activeEntry.value?.captions?.top?.text)
+    }
+
+    @Test
+    fun generation_recordsProvenance_andSelectFromHistoryRestoresModel() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val viewModel = createViewModel(mockRepository)
+        // Generate with a non-default model so a later restore is observable.
+        viewModel.selectModel(ImageModel.FLUX_SCHNELL)
+        val genFile = File.createTempFile("prov-gen-", ".img").apply { deleteOnExit() }
+        mockRepository.outcomeToReturn = GenerationOutcome.Success(genFile, seed = 4242)
+
+        viewModel.generateImage("a corgi on the bridge", File("dummy_cache"))
+        testDispatcher.scheduler.runCurrent()
+        mockRepository.gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val entry = viewModel.generationHistory.value.first()
+        assertEquals("a corgi on the bridge", entry.prompt)
+        assertEquals(ImageModel.FLUX_SCHNELL.id, entry.modelId)
+        assertEquals(4242, entry.seed)
+
+        // Load a gallery pick (no provenance) and flip the model away.
+        val pick = File.createTempFile("prov-pick-", ".img").apply { deleteOnExit() }
+        viewModel.setLoadedImage(pick)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.selectModel(ImageModel.JUGGERNAUT)
+
+        // Tapping the generated entry restores the model that produced it.
+        viewModel.selectFromHistory(entry.file)
+        assertEquals(ImageModel.FLUX_SCHNELL, viewModel.selectedModel.value)
+    }
+
+    @Test
+    fun captionEdits_arePersisted_andSurviveViewModelReload() = runTest(testDispatcher) {
+        val dataStore = FakeDataStore()
+        val file = File(tempHistoryDir, "persist-cap.img").apply { createNewFile(); deleteOnExit() }
+
+        val vm1 = createViewModel(MockImageRepository(), dataStore = dataStore)
+        vm1.setLoadedImage(file)
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm1.editActiveCaptions { it.copy(top = it.top.copy(text = "PERSIST ME")) }
+        // Let the debounced caption write run.
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Simulate an app restart: a fresh ViewModel over the same DataStore +
+        // history dir must reload the edited caption (still as editable text).
+        val vm2 = createViewModel(MockImageRepository(), dataStore = dataStore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val reloaded = vm2.generationHistory.value.first { it.file.name.endsWith(file.name) }
+        assertEquals("PERSIST ME", reloaded.captions.top.text)
     }
 }

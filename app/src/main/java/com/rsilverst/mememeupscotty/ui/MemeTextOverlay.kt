@@ -166,9 +166,9 @@ internal fun MemeTextOverlay(
         contentAlignment = Alignment.Center
     ) {
         val innerModifier = if (size != null) {
-            Modifier.fillMaxSize().padding(18.dp)
+            Modifier.fillMaxSize().padding(CAPTION_INNER_PADDING)
         } else {
-            Modifier.padding(18.dp)
+            Modifier.padding(CAPTION_INNER_PADDING)
         }
 
         // Visual padded inner box representing the dashed text bounds
@@ -194,16 +194,16 @@ internal fun MemeTextOverlay(
             BoxWithConstraints {
             val maxWidthPx = constraints.maxWidth
             val maxHeightPx = if (size != null) {
-                (size.height - with(density) { 36.dp.toPx() }).toInt().coerceAtLeast(0)
+                (size.height - with(density) { (CAPTION_INNER_PADDING * 2).toPx() }).toInt().coerceAtLeast(0)
             } else {
-                with(density) { 96.dp.toPx() }.toInt()
+                with(density) { CAPTION_DEFAULT_MAX_HEIGHT.toPx() }.toInt()
             }
             val displayedValue = if (style.allCaps) value.uppercase() else value
             val displayText = displayedValue.ifEmpty { placeholder }
             val fontSize = remember(displayText, maxWidthPx, maxHeightPx, fontFamily, fontWeight) {
                 findBestFitFontSize(displayText, textMeasurer, fontFamily, fontWeight, maxWidthPx, maxHeightPx)
             }
-            val strokeWidthPx = with(density) { (fontSize.value * 0.15f).sp.toPx() }
+            val strokeWidthPx = with(density) { (fontSize.value * CAPTION_STROKE_RATIO).sp.toPx() }
             val baseStyle = TextStyle(
                 fontSize = fontSize,
                 fontWeight = fontWeight,
@@ -402,10 +402,17 @@ internal fun AddTextPill(
     }
 }
 
+// Layout constants shared by the interactive overlay and the read-only
+// StaticMemeCaption so a caption renders identically on the canvas and (scaled)
+// in a history thumbnail. Drift here would break that WYSIWYG guarantee.
+internal val CAPTION_INNER_PADDING = 18.dp
+internal val CAPTION_DEFAULT_MAX_HEIGHT = 96.dp
+internal const val CAPTION_STROKE_RATIO = 0.15f
+
 // Caption font fitting — binary-stepped largest-fit search across the
 // allowed width × height envelope. Cached by callers with remember(...)
 // so it doesn't run on every recomposition.
-private fun findBestFitFontSize(
+internal fun findBestFitFontSize(
     text: String,
     textMeasurer: TextMeasurer,
     fontFamily: FontFamily,

@@ -19,7 +19,7 @@ import kotlin.random.Random
 // (and on GenerationError below) rather than reading any human-readable
 // strings — string copy lives entirely in the resource layer now.
 sealed class GenerationOutcome {
-    data class Success(val file: File) : GenerationOutcome()
+    data class Success(val file: File, val seed: Int = 0) : GenerationOutcome()
     data class Failure(val error: GenerationError) : GenerationOutcome()
 }
 
@@ -65,12 +65,15 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
                 ?: return@withContext failure(GenerationError.Unexpected("Model $owner/$name has no published version"))
 
             val config = MODEL_PROMPT_CONFIGS[modelId] ?: DEFAULT_PROMPT_CONFIG
+            // Capture the seed so it can travel back to the UI as provenance —
+            // a reloaded history entry records which seed produced the image.
+            val seed = Random.nextInt(0, Int.MAX_VALUE)
             val request = ReplicatePredictionRequest(
                 version = versionId,
                 input = ReplicatePredictionInput(
                     prompt = composePrompt(prompt, config),
                     negativePrompt = config.negativePrompt,
-                    seed = Random.nextInt(0, Int.MAX_VALUE),
+                    seed = seed,
                     // Personal/single-user app — brief explicitly says no content moderation.
                     // Models that don't accept this field ignore it.
                     disableSafetyChecker = true
@@ -91,7 +94,7 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
                     val file = File.createTempFile("generated_meme_", ".png", cacheDir)
                     tempFile = file
                     downloadTo(url, file)
-                    GenerationOutcome.Success(file)
+                    GenerationOutcome.Success(file, seed)
                 }
                 "failed", "canceled" -> {
                     failure(GenerationError.Unexpected(finished.error ?: "Prediction ${finished.status}"))

@@ -30,7 +30,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rsilverst.mememeupscotty.R
 import com.rsilverst.mememeupscotty.ui.theme.TextLow
+import com.rsilverst.mememeupscotty.ui.viewmodel.CaptionSnapshot
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
+import com.rsilverst.mememeupscotty.ui.viewmodel.HistoryEntry
 import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 
 // Phone layout: all controls (prompt, model picker, Energize) sit above
@@ -43,10 +45,8 @@ internal fun CompactLayout(
     modifier: Modifier,
     prompt: String,
     onPromptChange: (String) -> Unit,
-    topText: String,
-    onTopTextChange: (String) -> Unit,
-    bottomText: String,
-    onBottomTextChange: (String) -> Unit,
+    captions: CaptionSnapshot,
+    onCaptionsChange: ((CaptionSnapshot) -> CaptionSnapshot) -> Unit,
     generationState: GenerationState,
     selectedModel: ImageModel,
     hasGeneratedImage: Boolean,
@@ -60,7 +60,7 @@ internal fun CompactLayout(
     onPromptChip: (String) -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
     onPickImage: () -> Unit,
-    generationHistory: List<java.io.File>,
+    generationHistory: List<HistoryEntry>,
     activeFile: java.io.File?,
     onSelectFromHistory: (java.io.File) -> Unit,
     onDeleteFromHistory: (java.io.File) -> Unit,
@@ -114,10 +114,8 @@ internal fun CompactLayout(
 
         MemeCanvas(
             generationState = generationState,
-            topText = topText,
-            onTopTextChange = onTopTextChange,
-            bottomText = bottomText,
-            onBottomTextChange = onBottomTextChange,
+            captions = captions,
+            onCaptionsChange = onCaptionsChange,
             capturing = capturing,
             graphicsLayer = graphicsLayer,
             onPromptChip = onPromptChip,
@@ -175,10 +173,8 @@ internal fun ExpandedLayout(
     modifier: Modifier,
     prompt: String,
     onPromptChange: (String) -> Unit,
-    topText: String,
-    onTopTextChange: (String) -> Unit,
-    bottomText: String,
-    onBottomTextChange: (String) -> Unit,
+    captions: CaptionSnapshot,
+    onCaptionsChange: ((CaptionSnapshot) -> CaptionSnapshot) -> Unit,
     generationState: GenerationState,
     selectedModel: ImageModel,
     hasGeneratedImage: Boolean,
@@ -192,7 +188,7 @@ internal fun ExpandedLayout(
     onPromptChip: (String) -> Unit,
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
     onPickImage: () -> Unit,
-    generationHistory: List<java.io.File>,
+    generationHistory: List<HistoryEntry>,
     activeFile: java.io.File?,
     onSelectFromHistory: (java.io.File) -> Unit,
     onDeleteFromHistory: (java.io.File) -> Unit,
@@ -215,10 +211,8 @@ internal fun ExpandedLayout(
         ) {
             MemeCanvas(
                 generationState = generationState,
-                topText = topText,
-                onTopTextChange = onTopTextChange,
-                bottomText = bottomText,
-                onBottomTextChange = onBottomTextChange,
+                captions = captions,
+                onCaptionsChange = onCaptionsChange,
                 capturing = capturing,
                 graphicsLayer = graphicsLayer,
                 onPromptChip = onPromptChip,

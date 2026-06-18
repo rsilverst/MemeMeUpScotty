@@ -54,7 +54,9 @@ import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space600
 import com.rsilverst.mememeupscotty.ui.theme.Space900
 import com.rsilverst.mememeupscotty.ui.theme.TextHigh
+import com.rsilverst.mememeupscotty.ui.viewmodel.CaptionSnapshot
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
+import com.rsilverst.mememeupscotty.ui.viewmodel.HistoryEntry
 import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 import com.rsilverst.mememeupscotty.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
@@ -184,14 +186,28 @@ private fun MemeContent(
     viewModel: MainViewModel,
     generationState: GenerationState,
     selectedModel: ImageModel,
-    generationHistory: List<java.io.File>,
+    generationHistory: List<HistoryEntry>,
     hasGeneratedImage: Boolean,
     snackbarHostState: SnackbarHostState,
     onOpenModelPicker: () -> Unit
 ) {
     var prompt by remember { mutableStateOf("") }
-    var topText by remember { mutableStateOf("") }
-    var bottomText by remember { mutableStateOf("") }
+
+    // Captions live with the active history entry in the ViewModel, so they
+    // travel with their image and survive a reload — still as editable text,
+    // never baked in until Save / Share. The canvas reads this snapshot and
+    // edits it through editActiveCaptions.
+    val activeEntry by viewModel.activeEntry.collectAsState()
+    val captions = activeEntry?.captions ?: CaptionSnapshot()
+
+    // When the active image changes (cold start, history tap, new generation),
+    // restore the prompt that produced it. Keyed on the file so typing into the
+    // prompt for the current image is never clobbered. Gallery picks carry no
+    // prompt, so the field is left as-is for those.
+    val activeFilePath = activeEntry?.file?.absolutePath
+    LaunchedEffect(activeFilePath) {
+        activeEntry?.prompt?.let { prompt = it }
+    }
 
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
@@ -347,10 +363,8 @@ private fun MemeContent(
             modifier = modifier,
             prompt = prompt,
             onPromptChange = { prompt = it },
-            topText = topText,
-            onTopTextChange = { topText = it },
-            bottomText = bottomText,
-            onBottomTextChange = { bottomText = it },
+            captions = captions,
+            onCaptionsChange = viewModel::editActiveCaptions,
             generationState = generationState,
             selectedModel = selectedModel,
             hasGeneratedImage = hasGeneratedImage,
@@ -375,10 +389,8 @@ private fun MemeContent(
             modifier = modifier,
             prompt = prompt,
             onPromptChange = { prompt = it },
-            topText = topText,
-            onTopTextChange = { topText = it },
-            bottomText = bottomText,
-            onBottomTextChange = { bottomText = it },
+            captions = captions,
+            onCaptionsChange = viewModel::editActiveCaptions,
             generationState = generationState,
             selectedModel = selectedModel,
             hasGeneratedImage = hasGeneratedImage,
