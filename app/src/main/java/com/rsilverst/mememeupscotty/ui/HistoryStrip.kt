@@ -92,13 +92,13 @@ internal fun HistoryStrip(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(R.string.history_label).uppercase(),
+                    text = "STARDATE ${getCurrentStardate()}",
                     style = MaterialTheme.typography.labelMedium,
                     color = TextLow
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "· ${history.size}",
+                    text = "· ${history.size} entries",
                     style = MaterialTheme.typography.labelMedium,
                     color = TextMid
                 )
@@ -123,7 +123,7 @@ internal fun HistoryStrip(
         Box(modifier = Modifier.fillMaxWidth()) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 items(history, key = { it.file.absolutePath }) { entry ->
@@ -219,7 +219,8 @@ private fun HistoryThumb(
         shape = RoundedCornerShape(10.dp),
         color = Space900,
         border = BorderStroke(borderWidth, borderColor),
-        modifier = Modifier.size(52.dp)
+        shadowElevation = 6.dp,
+        modifier = Modifier.size(64.dp)
     ) {
         Box(
             modifier = Modifier
@@ -326,4 +327,10 @@ private fun BoxScope.ThumbCaptionSlot(
             modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+private fun getCurrentStardate(): String {
+    val timestamp = System.currentTimeMillis()
+    val stardate = (timestamp / 86400000.0 * 1000.0) % 100000.0
+    return String.format(java.util.Locale.US, "%.1f", stardate)
 }
