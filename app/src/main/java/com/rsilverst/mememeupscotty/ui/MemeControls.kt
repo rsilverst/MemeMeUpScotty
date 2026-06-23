@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rsilverst.mememeupscotty.R
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
+import com.rsilverst.mememeupscotty.ui.theme.Plasma700
 import com.rsilverst.mememeupscotty.ui.theme.Red500
 import com.rsilverst.mememeupscotty.ui.theme.Space400
 import com.rsilverst.mememeupscotty.ui.theme.Space500
@@ -91,14 +92,14 @@ internal fun HudStrip(
                 modifier = Modifier
                     .size(22.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Plasma500.copy(alpha = 0.12f))
-                    .border(1.dp, Plasma500.copy(alpha = 0.30f), RoundedCornerShape(6.dp)),
+                    .background(Plasma700.copy(alpha = 0.12f))
+                    .border(1.dp, Plasma700.copy(alpha = 0.30f), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = selectedModel.shortGlyph,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, letterSpacing = 0.sp),
-                    color = Plasma500
+                    color = Plasma700
                 )
             }
             Text(
@@ -129,7 +130,7 @@ internal fun PromptInput(
     onSubmit: (() -> Unit)? = null
 ) {
     var focused by remember { mutableStateOf(false) }
-    val borderColor = if (focused) Plasma500 else Space500
+    val borderColor = if (focused) Plasma700 else Space500
     // BasicTextField rejects minLines != 1 when singleLine is true. Guard so
     // a misconfigured call doesn't crash at runtime.
     val effectiveMinLines = if (singleLine) 1 else minLines

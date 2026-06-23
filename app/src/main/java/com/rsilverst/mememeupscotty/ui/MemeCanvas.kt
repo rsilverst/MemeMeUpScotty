@@ -72,6 +72,7 @@ import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
+import com.rsilverst.mememeupscotty.ui.theme.Plasma700
 import com.rsilverst.mememeupscotty.ui.theme.Red500
 import com.rsilverst.mememeupscotty.ui.theme.Photon500
 import com.rsilverst.mememeupscotty.ui.theme.Solar500
@@ -332,7 +333,7 @@ private fun PhotoSourceChip(onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = Space900.copy(alpha = 0.72f),
-        border = BorderStroke(1.dp, Plasma500.copy(alpha = 0.40f)),
+        border = BorderStroke(1.dp, Plasma700.copy(alpha = 0.40f)),
         contentColor = TextHigh,
         modifier = Modifier.height(32.dp)
     ) {
@@ -344,7 +345,7 @@ private fun PhotoSourceChip(onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Outlined.Image,
                 contentDescription = null,
-                tint = Plasma500,
+                tint = Plasma700,
                 modifier = Modifier.size(14.dp)
             )
             Text(

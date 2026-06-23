@@ -39,7 +39,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rsilverst.mememeupscotty.R
-import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Plasma700
 import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space600
@@ -232,7 +231,7 @@ private fun ColorSwatch(
             CaptionFill.RED    -> R.string.caption_color_red
         }
     )
-    val ringColor = if (isSelected) Plasma500 else Space500
+    val ringColor = if (isSelected) Plasma700 else Space500
     Surface(
         onClick = onClick,
         shape = CircleShape,
@@ -304,7 +303,7 @@ private fun AlignButton(
 ) {
     val borderColor = if (isSelected) Plasma700 else Space500
     val bg = if (isSelected) Space600.copy(alpha = 0.6f) else Space800
-    val tint = if (isSelected) Plasma500 else TextMid
+    val tint = if (isSelected) Plasma700 else TextMid
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -348,7 +347,7 @@ private fun OutlineRow(
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Space900,
-                checkedTrackColor = Plasma500,
+                checkedTrackColor = Plasma700,
                 uncheckedThumbColor = TextLow,
                 uncheckedTrackColor = Space600,
                 uncheckedBorderColor = Space500
@@ -382,7 +381,7 @@ private fun AllCapsRow(
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Space900,
-                checkedTrackColor = Plasma500,
+                checkedTrackColor = Plasma700,
                 uncheckedThumbColor = TextLow,
                 uncheckedTrackColor = Space600,
                 uncheckedBorderColor = Space500

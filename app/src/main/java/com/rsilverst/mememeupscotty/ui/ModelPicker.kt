@@ -33,7 +33,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rsilverst.mememeupscotty.R
-import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Plasma700
 import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space600
@@ -69,14 +68,14 @@ internal fun ModelSelectorButton(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Plasma500.copy(alpha = 0.12f))
-                    .border(1.dp, Plasma500.copy(alpha = 0.30f), RoundedCornerShape(6.dp)),
+                    .background(Plasma700.copy(alpha = 0.12f))
+                    .border(1.dp, Plasma700.copy(alpha = 0.30f), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = model.shortGlyph,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, letterSpacing = 0.sp),
-                    color = Plasma500
+                    color = Plasma700
                 )
             }
             Spacer(Modifier.width(10.dp))
@@ -180,11 +179,11 @@ private fun ModelCard(
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
-                        if (isSelected) Plasma500.copy(alpha = 0.10f) else Space700
+                        if (isSelected) Plasma700.copy(alpha = 0.10f) else Space700
                     )
                     .border(
                         1.dp,
-                        if (isSelected) Plasma500.copy(alpha = 0.30f) else Space500,
+                        if (isSelected) Plasma700.copy(alpha = 0.30f) else Space500,
                         RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -195,7 +194,7 @@ private fun ModelCard(
                         fontSize = 18.sp,
                         letterSpacing = 0.sp
                     ),
-                    color = if (isSelected) Plasma500 else TextMid
+                    color = if (isSelected) Plasma700 else TextMid
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -211,20 +210,20 @@ private fun ModelCard(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(Plasma500.copy(alpha = 0.10f))
+                                .background(Plasma700.copy(alpha = 0.10f))
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Check,
                                 contentDescription = null,
-                                tint = Plasma500,
+                                tint = Plasma700,
                                 modifier = Modifier.size(12.dp)
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
                                 text = stringResource(R.string.model_active).uppercase(),
                                 style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp),
-                                color = Plasma500
+                                color = Plasma700
                             )
                         }
                     }
