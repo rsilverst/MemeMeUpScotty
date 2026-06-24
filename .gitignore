@@ -25,3 +25,6 @@ build/
 *.keystore
 /UX_REVIEW.md
 /CODE_REVIEW.md
+
+# Local design prototype, not for version control
+/mockups/e6-multitasking.html
