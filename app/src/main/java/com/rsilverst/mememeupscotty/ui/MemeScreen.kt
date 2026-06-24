@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.rsilverst.mememeupscotty.R
+import com.rsilverst.mememeupscotty.data.repository.GenerationError
 import com.rsilverst.mememeupscotty.ui.theme.MemeMeUpScottyTheme
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Space500
@@ -75,15 +76,46 @@ fun MemeScreen(
     viewModel: MainViewModel
 ) {
     val generationState by viewModel.generationState.collectAsState()
+    val activeEntry by viewModel.activeEntry.collectAsState()
     val selectedModel by viewModel.selectedModel.collectAsState()
     val generationHistory by viewModel.generationHistory.collectAsState()
     var hasGeneratedImage by remember { mutableStateOf(false) }
     var modelPickerOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val currentError = (generationState as? GenerationState.Error)?.error
+    val errorTitle = currentError?.let { error ->
+        when (error) {
+            GenerationError.AuthRejected -> stringResource(R.string.error_title_auth)
+            GenerationError.OutOfCredit -> stringResource(R.string.error_title_quota)
+            GenerationError.ModelUnavailable -> stringResource(R.string.error_title_not_found)
+            is GenerationError.RateLimited -> stringResource(R.string.error_title_rate_limit)
+            is GenerationError.Server -> stringResource(R.string.error_title_server)
+            GenerationError.Timeout -> stringResource(R.string.error_title_timeout)
+            is GenerationError.Unexpected -> stringResource(R.string.error_title_generic)
+        }
+    }
+    val errorDetail = currentError?.let { error ->
+        when (error) {
+            GenerationError.AuthRejected -> stringResource(R.string.error_detail_auth)
+            GenerationError.OutOfCredit -> stringResource(R.string.error_detail_quota)
+            GenerationError.ModelUnavailable -> stringResource(R.string.error_detail_not_found)
+            is GenerationError.RateLimited -> error.retryAfterSec?.let {
+                stringResource(R.string.error_detail_rate_limit_retry, it)
+            } ?: stringResource(R.string.error_detail_rate_limit_no_retry)
+            is GenerationError.Server -> stringResource(R.string.error_detail_server, error.httpCode)
+            GenerationError.Timeout -> stringResource(R.string.error_detail_timeout)
+            is GenerationError.Unexpected -> error.detail
+        }
+    }
+
     LaunchedEffect(generationState) {
         if (generationState is GenerationState.Success) {
             hasGeneratedImage = true
+        } else if (generationState is GenerationState.Error && activeEntry != null) {
+            if (errorTitle != null && errorDetail != null) {
+                snackbarHostState.showSnackbar("$errorTitle $errorDetail")
+            }
         }
     }
 
@@ -102,6 +134,7 @@ fun MemeScreen(
                     .fillMaxSize()
                     .padding(paddingValues),
                 viewModel = viewModel,
+                activeEntry = activeEntry,
                 generationState = generationState,
                 selectedModel = selectedModel,
                 generationHistory = generationHistory,
@@ -184,6 +217,7 @@ private fun StardateSnackbarHost(hostState: SnackbarHostState) {
 private fun MemeContent(
     modifier: Modifier = Modifier,
     viewModel: MainViewModel,
+    activeEntry: HistoryEntry?,
     generationState: GenerationState,
     selectedModel: ImageModel,
     generationHistory: List<HistoryEntry>,
@@ -197,16 +231,16 @@ private fun MemeContent(
     // travel with their image and survive a reload — still as editable text,
     // never baked in until Save / Share. The canvas reads this snapshot and
     // edits it through editActiveCaptions.
-    val activeEntry by viewModel.activeEntry.collectAsState()
-    val captions = activeEntry?.captions ?: CaptionSnapshot()
+    val activeEntryFromState = activeEntry
+    val captions = activeEntryFromState?.captions ?: CaptionSnapshot()
 
     // When the active image changes (cold start, history tap, new generation),
     // restore the prompt that produced it. Keyed on the file so typing into the
     // prompt for the current image is never clobbered. Gallery picks carry no
     // prompt, so the field is left as-is for those.
-    val activeFilePath = activeEntry?.file?.absolutePath
+    val activeFilePath = activeEntryFromState?.file?.absolutePath
     LaunchedEffect(activeFilePath) {
-        activeEntry?.prompt?.let { prompt = it }
+        activeEntryFromState?.prompt?.let { prompt = it }
     }
 
     val focusManager = LocalFocusManager.current
@@ -319,10 +353,6 @@ private fun MemeContent(
         viewModel.selectFromHistory(file)
     }
 
-    // The currently displayed image, used by the history strip to render
-    // the selected ring. Null in Idle/Loading/Error.
-    val activeFile: java.io.File? = (generationState as? GenerationState.Success)?.imageFile
-
     val onPromptChipClick: (String) -> Unit = { suggestion ->
         prompt = suggestion
     }
@@ -379,7 +409,7 @@ private fun MemeContent(
             onCaptionDeleted = onCaptionDeleted,
             onPickImage = onPickImage,
             generationHistory = generationHistory,
-            activeFile = activeFile,
+            activeEntry = activeEntry,
             onSelectFromHistory = onSelectFromHistory,
             onDeleteFromHistory = onDeleteFromHistory,
             onClearAllHistory = onClearAllHistory
@@ -405,7 +435,7 @@ private fun MemeContent(
             onCaptionDeleted = onCaptionDeleted,
             onPickImage = onPickImage,
             generationHistory = generationHistory,
-            activeFile = activeFile,
+            activeEntry = activeEntry,
             onSelectFromHistory = onSelectFromHistory,
             onDeleteFromHistory = onDeleteFromHistory,
             onClearAllHistory = onClearAllHistory

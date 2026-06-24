@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -207,31 +209,45 @@ internal fun EnergizeButton(
     val contentColor = if (isLoading) Red500 else Space900
     val icon = if (isLoading) Icons.Filled.Close else Icons.Filled.Bolt
 
-    Button(
-        onClick = if (isLoading) onCancel else onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(54.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
-            contentColor = contentColor
-        ),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.titleMedium.copy(
-                letterSpacing = 2.5.sp,
-                fontWeight = FontWeight.Bold
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = if (isLoading) onCancel else onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = containerColor,
+                contentColor = contentColor
+            ),
+            contentPadding = PaddingValues(horizontal = 16.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
             )
-        )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = label.uppercase(),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    letterSpacing = 2.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+
+        if (isLoading) {
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                color = Red500,
+                trackColor = Color.Transparent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(1.dp))
+            )
+        }
     }
 }
 

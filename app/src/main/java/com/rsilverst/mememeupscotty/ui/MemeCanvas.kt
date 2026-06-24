@@ -1,22 +1,19 @@
 package com.rsilverst.mememeupscotty.ui
 
-import android.annotation.SuppressLint
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -28,13 +25,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,32 +46,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.rsilverst.mememeupscotty.R
-import com.rsilverst.mememeupscotty.data.repository.GenerationError
-import com.rsilverst.mememeupscotty.ui.theme.MemeCaptionFontFamily
+import com.rsilverst.mememeupscotty.ui.theme.Photon500
 import com.rsilverst.mememeupscotty.ui.theme.Plasma300
 import com.rsilverst.mememeupscotty.ui.theme.Plasma500
 import com.rsilverst.mememeupscotty.ui.theme.Plasma700
 import com.rsilverst.mememeupscotty.ui.theme.Red500
-import com.rsilverst.mememeupscotty.ui.theme.Photon500
 import com.rsilverst.mememeupscotty.ui.theme.Solar500
 import com.rsilverst.mememeupscotty.ui.theme.Space500
 import com.rsilverst.mememeupscotty.ui.theme.Space700
@@ -85,36 +73,38 @@ import com.rsilverst.mememeupscotty.ui.theme.TextLow
 import com.rsilverst.mememeupscotty.ui.theme.TextMid
 import com.rsilverst.mememeupscotty.ui.viewmodel.CaptionSnapshot
 import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
+import com.rsilverst.mememeupscotty.data.repository.GenerationError
+import com.rsilverst.mememeupscotty.ui.viewmodel.HistoryEntry
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
 
-// Square canvas containing the active state (idle / loading / image / error)
-// plus the two caption overlays. Records itself into the supplied graphics
-// layer on every recomposition so bitmap capture (Save / Share) is one
-// `graphicsLayer.toImageBitmap()` call away.
+// The main visual area showing the active image and captions, or fallback
+// states (empty, loading, error) if nothing is loaded. It also handles capturing
+// a snapshot of its content into a GraphicsLayer for Save/Share.
 
 @Composable
 internal fun MemeCanvas(
     generationState: GenerationState,
+    activeEntry: HistoryEntry?,
     captions: CaptionSnapshot,
     onCaptionsChange: ((CaptionSnapshot) -> CaptionSnapshot) -> Unit,
     capturing: Boolean,
     graphicsLayer: GraphicsLayer,
     onPromptChip: (String) -> Unit,
     onRetry: () -> Unit,
-    onCaptionDeleted: (onUndo: () -> Unit) -> Unit = {},
-    onPickImage: () -> Unit = {},
-    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
+    onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
+    onPickImage: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val top = captions.top
     val bottom = captions.bottom
-    var styleSheetTarget by remember { mutableStateOf<CaptionTarget?>(null) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    val showControls = !capturing
 
-    // Every caption edit also records the current (square) canvas side so other
-    // surfaces — the history thumbnails — can place the captions proportionally.
+    // If the canvas width changed (e.g. device rotation, split screen), record
+    // it in the snapshot. The TextOverlays need this reference width so their
+    // internal wrap logic (how many characters fit per line) remains identical
+    // to what the HistoryStrip will compute for its scaled thumbnails.
     val editCaptions: ((CaptionSnapshot) -> CaptionSnapshot) -> Unit = { transform ->
         onCaptionsChange { snap ->
             val stamped = if (canvasSize.width > 0) snap.copy(refSize = canvasSize.width.toFloat()) else snap
@@ -146,25 +136,28 @@ internal fun MemeCanvas(
             },
         contentAlignment = Alignment.Center
     ) {
-        when (generationState) {
-            is GenerationState.Idle    -> EmptyState(onPromptChip = onPromptChip)
-            is GenerationState.Loading -> LoadingState()
-            is GenerationState.Success -> {
-                AsyncImage(
-                    model = generationState.imageFile,
-                    contentDescription = "Generated Meme",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            is GenerationState.Error   -> ErrorState(
-                error = generationState.error,
-                onRetry = onRetry
+        val displayedFile = activeEntry?.file
+        if (displayedFile != null) {
+            AsyncImage(
+                model = displayedFile,
+                contentDescription = "Generated Meme",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            // Full screen loaders / empty states when no image is loaded
+            when (generationState) {
+                is GenerationState.Loading -> LoadingState()
+                is GenerationState.Error   -> ErrorState(
+                    error = generationState.error,
+                    onRetry = onRetry
+                )
+                else -> EmptyState(onPromptChip = onPromptChip)
+            }
         }
 
         // Captions only make sense once there's an image to put them on.
-        if (generationState is GenerationState.Success) {
+        if (displayedFile != null) {
             if (top.visible) {
                 MemeTextOverlay(
                     value = top.text,
@@ -179,28 +172,17 @@ internal fun MemeCanvas(
                     parentSize = canvasSize,
                     onDelete = {
                         val restore = top
-                        onCaptionsChange {
-                            it.copy(top = it.top.copy(visible = false, offsetX = 0f, offsetY = 0f, width = null, height = null))
+                        onCaptionsChange { snap ->
+                            snap.copy(top = snap.top.copy(visible = false, offsetX = 0f, offsetY = 0f, width = null, height = null))
                         }
                         onCaptionDeleted {
-                            editCaptions { it.copy(top = restore) }
+                            onCaptionsChange { snap -> snap.copy(top = restore) }
                         }
                     },
-                    onOpenStyleSheet = { styleSheetTarget = CaptionTarget.TOP },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                )
-            } else if (showControls) {
-                AddTextPill(
-                    onClick = { editCaptions { it.copy(top = it.top.copy(visible = true)) } },
-                    label = stringResource(R.string.add_top_text),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 12.dp)
+                    onOpenStyleSheet = {},
+                    modifier = Modifier.align(Alignment.TopCenter)
                 )
             }
-
             if (bottom.visible) {
                 MemeTextOverlay(
                     value = bottom.text,
@@ -215,218 +197,43 @@ internal fun MemeCanvas(
                     parentSize = canvasSize,
                     onDelete = {
                         val restore = bottom
-                        onCaptionsChange {
-                            it.copy(bottom = it.bottom.copy(visible = false, offsetX = 0f, offsetY = 0f, width = null, height = null))
+                        onCaptionsChange { snap ->
+                            snap.copy(bottom = snap.bottom.copy(visible = false, offsetX = 0f, offsetY = 0f, width = null, height = null))
                         }
                         onCaptionDeleted {
-                            editCaptions { it.copy(bottom = restore) }
+                            onCaptionsChange { snap -> snap.copy(bottom = restore) }
                         }
                     },
-                    onOpenStyleSheet = { styleSheetTarget = CaptionTarget.BOTTOM },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                )
-            } else if (showControls) {
-                AddTextPill(
-                    onClick = { editCaptions { it.copy(bottom = it.bottom.copy(visible = true)) } },
-                    label = stringResource(R.string.add_bottom_text),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 12.dp)
+                    onOpenStyleSheet = {},
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
         }
 
-        // Persistent "Use a photo" affordance pinned to the canvas
-        // top-right. Visible in every canvas state — idle (primary
-        // discoverability), loading, success (acts as "replace"), and
-        // error — and fades only during capture so it never leaks into
-        // a saved/shared bitmap.
-        AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(160)),
+        // Top-right pill for importing from gallery (independent of generation state)
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(8.dp)
-        ) {
-            PhotoSourceChip(onClick = onPickImage)
-        }
-    }
-
-    when (styleSheetTarget) {
-        CaptionTarget.TOP -> CaptionStyleSheet(
-            style = top.toStyle(),
-            onStyleChange = { s -> editCaptions { it.copy(top = it.top.withStyle(s)) } },
-            onDismiss = { styleSheetTarget = null }
-        )
-        CaptionTarget.BOTTOM -> CaptionStyleSheet(
-            style = bottom.toStyle(),
-            onStyleChange = { s -> editCaptions { it.copy(bottom = it.bottom.withStyle(s)) } },
-            onDismiss = { styleSheetTarget = null }
-        )
-        null -> Unit
-    }
-}
-
-private enum class CaptionTarget { TOP, BOTTOM }
-
-// ============================================================================
-// Canvas states
-// ============================================================================
-
-@Composable
-private fun EmptyState(onPromptChip: (String) -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        TransporterPad(modifier = Modifier.size(80.dp))
-        Spacer(Modifier.height(18.dp))
-        Text(
-            text = stringResource(R.string.idle_instruction),
-            style = MaterialTheme.typography.titleLarge,
-            color = TextHigh,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.idle_try_one).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = TextLow
-        )
-        Spacer(Modifier.height(12.dp))
-        val chips = listOf(
-            stringResource(R.string.suggested_prompt_1),
-            stringResource(R.string.suggested_prompt_2),
-            stringResource(R.string.suggested_prompt_3)
-        )
-        chips.forEachIndexed { index, chip ->
-            val color = when (index) {
-                0 -> Plasma500
-                1 -> Photon500
-                else -> Solar500
-            }
-            PromptChip(
-                label = chip,
-                borderColor = color.copy(alpha = 0.40f),
-                textColor = color.copy(alpha = 0.90f),
-                backgroundColor = color.copy(alpha = 0.06f),
-                onClick = { onPromptChip(chip) }
-            )
-            Spacer(Modifier.height(8.dp))
-        }
-    }
-}
-
-// Persistent source-picker chip pinned to the canvas top-right corner.
-// Labeled (icon + text) so its purpose is obvious in every state — not
-// just an unmarked overlay glyph. Semi-opaque dark fill so it reads
-// against any generated image without depending on the underlying hue.
-@Composable
-private fun PhotoSourceChip(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = Space900.copy(alpha = 0.72f),
-        border = BorderStroke(1.dp, Plasma700.copy(alpha = 0.40f)),
-        contentColor = TextHigh,
-        modifier = Modifier.height(32.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp),
+                .padding(16.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Space900.copy(alpha = 0.75f))
+                .clickable { onPickImage() }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
-                imageVector = Icons.Outlined.Image,
+                imageVector = Icons.Filled.AddPhotoAlternate,
                 contentDescription = null,
-                tint = Plasma700,
-                modifier = Modifier.size(14.dp)
+                tint = Photon500,
+                modifier = Modifier.size(16.dp)
             )
             Text(
                 text = stringResource(R.string.use_photo),
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelMedium,
+                color = TextHigh
             )
         }
-    }
-}
-
-@Composable
-private fun PromptChip(
-    label: String,
-    borderColor: Color,
-    textColor: Color,
-    backgroundColor: Color,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = backgroundColor,
-        border = BorderStroke(1.dp, borderColor),
-        contentColor = textColor
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
-}
-
-@Composable
-private fun TransporterPad(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val centerX = w / 2f
-        val baseY = h * 0.82f
-
-        // Outer pad ellipse
-        drawOval(
-            color = Plasma500.copy(alpha = 0.15f),
-            topLeft = Offset(w * 0.05f, baseY - h * 0.08f),
-            size = Size(w * 0.9f, h * 0.16f)
-        )
-        drawOval(
-            color = Color.Transparent,
-            topLeft = Offset(w * 0.05f, baseY - h * 0.08f),
-            size = Size(w * 0.9f, h * 0.16f),
-            style = Stroke(width = 1.dp.toPx())
-        )
-
-        // Inner pad ellipse
-        drawOval(
-            color = Plasma500.copy(alpha = 0.30f),
-            topLeft = Offset(w * 0.22f, baseY - h * 0.05f),
-            size = Size(w * 0.56f, h * 0.10f)
-        )
-
-        // Vertical beam lines
-        val dash = PathEffect.dashPathEffect(floatArrayOf(4f, 6f))
-        val beamHeights = listOf(0.10f to 0.6f, 0.18f to 0.9f, 0.10f to 0.6f)
-        val xs = listOf(centerX - w * 0.30f, centerX, centerX + w * 0.30f)
-        xs.zip(beamHeights).forEach { (x, top) ->
-            drawLine(
-                color = Plasma500.copy(alpha = top.second),
-                start = Offset(x, h * top.first),
-                end = Offset(x, baseY - h * 0.02f),
-                strokeWidth = 1.dp.toPx(),
-                pathEffect = dash
-            )
-        }
-
-        // Center beam dot
-        drawCircle(
-            color = Plasma300,
-            radius = 3.dp.toPx(),
-            center = Offset(centerX, baseY - h * 0.02f)
-        )
     }
 }
 
@@ -545,218 +352,109 @@ private fun LoadingState() {
 
 @Composable
 private fun ErrorState(error: GenerationError, onRetry: () -> Unit) {
-    val title = stringResource(error.titleRes())
-    val detail = error.detailText()
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Space700)
-            .padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier.padding(32.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(Red500.copy(alpha = 0.1f))
-                .border(1.dp, Red500.copy(alpha = 0.4f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.ErrorOutline,
-                contentDescription = null,
-                tint = Red500
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = TextHigh,
-            textAlign = TextAlign.Center
+        Icon(
+            imageVector = Icons.Filled.Warning,
+            contentDescription = null,
+            tint = Red500,
+            modifier = Modifier.size(48.dp)
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = detail,
+            text = "TRANSPORTER MALFUNCTION",
+            style = MaterialTheme.typography.titleMedium,
+            color = Red500,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = when (error) {
+                is GenerationError.Unexpected -> error.detail
+                is GenerationError.Server -> "Server error \${error.httpCode}"
+                is GenerationError.RateLimited -> "Rate limited. Try again later."
+                GenerationError.Timeout -> "Request timed out."
+                GenerationError.AuthRejected -> "Authentication failed."
+                GenerationError.OutOfCredit -> "Out of credits."
+                GenerationError.ModelUnavailable -> "Model unavailable."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = TextMid,
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(20.dp))
-        Surface(
-            onClick = onRetry,
-            shape = RoundedCornerShape(50),
-            color = Plasma500,
-            contentColor = Space900
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = stringResource(R.string.error_try_again).uppercase(),
-                    style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.5.sp)
-                )
-            }
-        }
-    }
-}
-
-// GenerationError → headline resource. Pure when-mapping; no string
-// keyword matching. Adding a variant requires updating this and
-// detailText() below — the compiler will flag the missing case.
-private fun GenerationError.titleRes(): Int = when (this) {
-    GenerationError.AuthRejected      -> R.string.error_title_auth
-    GenerationError.OutOfCredit       -> R.string.error_title_quota
-    GenerationError.ModelUnavailable  -> R.string.error_title_not_found
-    is GenerationError.RateLimited    -> R.string.error_title_rate_limit
-    is GenerationError.Server         -> R.string.error_title_server
-    GenerationError.Timeout           -> R.string.error_title_timeout
-    is GenerationError.Unexpected     -> R.string.error_title_generic
-}
-
-// GenerationError → detail body text. Wraps Compose's stringResource so
-// it can be called from the @Composable ErrorState; for variants with
-// parameters (RateLimited's retry seconds, Server's HTTP code) we use
-// the templated resource.
-@Composable
-private fun GenerationError.detailText(): String = when (this) {
-    GenerationError.AuthRejected     -> stringResource(R.string.error_detail_auth)
-    GenerationError.OutOfCredit      -> stringResource(R.string.error_detail_quota)
-    GenerationError.ModelUnavailable -> stringResource(R.string.error_detail_not_found)
-    is GenerationError.RateLimited   -> retryAfterSec?.let {
-        stringResource(R.string.error_detail_rate_limit_retry, it)
-    } ?: stringResource(R.string.error_detail_rate_limit_no_retry)
-    is GenerationError.Server        -> stringResource(R.string.error_detail_server, httpCode)
-    GenerationError.Timeout          -> stringResource(R.string.error_detail_timeout)
-    is GenerationError.Unexpected    -> detail
-}
-
-// ============================================================================
-// Previews
-// ============================================================================
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasEmptyStatePreview() {
-    PreviewShell {
-        PreviewCanvasFrame {
-            EmptyState(onPromptChip = {})
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasLoadingStatePreview() {
-    PreviewShell {
-        PreviewCanvasFrame {
-            LoadingState()
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasErrorStatePreview_Quota() {
-    PreviewShell {
-        PreviewCanvasFrame {
-            ErrorState(
-                error = GenerationError.OutOfCredit,
-                onRetry = {}
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasErrorStatePreview_Auth() {
-    PreviewShell {
-        PreviewCanvasFrame {
-            ErrorState(
-                error = GenerationError.AuthRejected,
-                onRetry = {}
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasErrorStatePreview_RateLimited() {
-    PreviewShell {
-        PreviewCanvasFrame {
-            ErrorState(
-                error = GenerationError.RateLimited(retryAfterSec = 30),
-                onRetry = {}
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasErrorStatePreview_Timeout() {
-    PreviewShell {
-        PreviewCanvasFrame {
-            ErrorState(
-                error = GenerationError.Timeout,
-                onRetry = {}
-            )
-        }
-    }
-}
-
-// Fake "image" — radial gradient stand-in so captions can be previewed
-// over picture-like content.
-@Preview(showBackground = true, backgroundColor = PREVIEW_BG, widthDp = 360, heightDp = 360)
-@Composable
-private fun CanvasSuccessWithCaptionsPreview() {
-    PreviewShell {
-        Box(
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(
             modifier = Modifier
-                .size(328.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFF3A2A5C),
-                            Color(0xFF1A1F3E),
-                            Color(0xFF0F1024)
-                        )
-                    )
-                )
-                .border(1.dp, Space500, RoundedCornerShape(20.dp)),
-            contentAlignment = Alignment.Center
+                .clip(RoundedCornerShape(8.dp))
+                .background(Space800)
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "I CAN HAS",
-                fontFamily = MemeCaptionFontFamily,
-                fontWeight = FontWeight.Normal,
-                fontSize = 36.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 20.dp)
-            )
-            Text(
-                text = "WARP DRIVE?",
-                fontFamily = MemeCaptionFontFamily,
-                fontWeight = FontWeight.Normal,
-                fontSize = 36.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 20.dp)
-            )
+            Icon(Icons.Filled.Refresh, null, tint = TextHigh, modifier = Modifier.size(18.dp))
+            Text("RETRY", color = TextHigh, style = MaterialTheme.typography.labelLarge)
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EmptyState(onPromptChip: (String) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.AutoAwesome,
+            contentDescription = null,
+            tint = Space500,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "AWAITING COORDINATES",
+            style = MaterialTheme.typography.titleMedium,
+            color = TextLow,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Enter a prompt below or pick a quick start.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextMid,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            PromptChip("a cute orange cat", onPromptChip)
+            Spacer(modifier = Modifier.size(8.dp))
+            PromptChip("cyberpunk city street", onPromptChip)
+            Spacer(modifier = Modifier.size(8.dp))
+            PromptChip("dog flying in space", onPromptChip)
+        }
+    }
+}
+
+@Composable
+private fun PromptChip(text: String, onClick: (String) -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Space800)
+            .clickable { onClick(text) }
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = TextHigh
+        )
     }
 }

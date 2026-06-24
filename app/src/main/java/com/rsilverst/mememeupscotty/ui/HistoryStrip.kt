@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,6 +83,19 @@ internal fun HistoryStrip(
     var fileToDelete by remember { mutableStateOf<File?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
 
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    var lastSize by remember { mutableStateOf(history.size) }
+
+    // Automatically scroll to the leftmost edge (index 0, newest item)
+    // when a new item is added to the history list
+    LaunchedEffect(history.size) {
+        if (history.size > lastSize && history.size > 1) {
+            listState.animateScrollToItem(0)
+        }
+        lastSize = history.size
+    }
+
     Column(modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -122,6 +136,7 @@ internal fun HistoryStrip(
         // has touched the strip.
         Box(modifier = Modifier.fillMaxWidth()) {
             LazyRow(
+                state = listState,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp),
                 modifier = Modifier.fillMaxWidth()

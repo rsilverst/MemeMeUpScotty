@@ -24,3 +24,13 @@
     <init>(...);
     <fields>;
 }
+
+# History persistence DTOs (CaptionSnapshot, CaptionData, HistoryEntryDto) are
+# deserialized by Moshi-codegen; the generated adapters reference their
+# constructors and properties by name. Scope the keep to the @JsonClass models
+# so the rest of the package (MainViewModel, state classes) can still shrink.
+-keep @com.squareup.moshi.JsonClass class com.rsilverst.mememeupscotty.ui.viewmodel.** { *; }
+-keepclassmembers @com.squareup.moshi.JsonClass class com.rsilverst.mememeupscotty.ui.viewmodel.** {
+    <init>(...);
+    <fields>;
+}

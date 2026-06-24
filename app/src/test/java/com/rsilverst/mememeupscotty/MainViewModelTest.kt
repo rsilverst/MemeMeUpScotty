@@ -422,4 +422,96 @@ class MainViewModelTest {
         val reloaded = vm2.generationHistory.value.first { it.file.name.endsWith(file.name) }
         assertEquals("PERSIST ME", reloaded.captions.top.text)
     }
+
+    @Test
+    fun deleteFromHistory_removesItemAndUpdatesActiveEntry() = runTest(testDispatcher) {
+        val viewModel = createViewModel(MockImageRepository())
+        val first = File.createTempFile("vm-first-", ".img").apply { deleteOnExit() }
+        val second = File.createTempFile("vm-second-", ".img").apply { deleteOnExit() }
+
+        viewModel.setLoadedImage(first)
+        viewModel.setLoadedImage(second)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(2, viewModel.generationHistory.value.size)
+        assertEquals(second.name, viewModel.activeEntry.value?.file?.name?.substringAfterLast("_"))
+
+        val secondFileInHistory = viewModel.activeEntry.value!!.file
+        viewModel.deleteFromHistory(secondFileInHistory)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, viewModel.generationHistory.value.size)
+        val activeFile = viewModel.activeEntry.value?.file
+        assertEquals(first.name, activeFile?.name?.substringAfterLast("_"))
+        val state = viewModel.generationState.value as GenerationState.Success
+        assertEquals(activeFile, state.imageFile)
+    }
+
+    @Test
+    fun deleteFromHistory_removesLastItemAndSetsStateToIdle() = runTest(testDispatcher) {
+        val viewModel = createViewModel(MockImageRepository())
+        val first = File.createTempFile("vm-first-", ".img").apply { deleteOnExit() }
+
+        viewModel.setLoadedImage(first)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, viewModel.generationHistory.value.size)
+        val firstFileInHistory = viewModel.activeEntry.value!!.file
+
+        viewModel.deleteFromHistory(firstFileInHistory)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.generationHistory.value.size)
+        assertEquals(null, viewModel.activeEntry.value)
+        assertEquals(GenerationState.Idle, viewModel.generationState.value)
+    }
+
+    @Test
+    fun deleteFromHistory_duringInFlightGeneration_doesNotOverwriteLoadingState() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val viewModel = createViewModel(mockRepository)
+        val first = File.createTempFile("vm-first-", ".img").apply { deleteOnExit() }
+        val second = File.createTempFile("vm-second-", ".img").apply { deleteOnExit() }
+
+        viewModel.setLoadedImage(first)
+        viewModel.setLoadedImage(second)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val historyBefore = viewModel.generationHistory.value
+        assertEquals(2, historyBefore.size)
+        val secondFileInHistory = historyBefore[0].file
+
+        // Start generation
+        val cacheDir = File("dummy_cache")
+        mockRepository.outcomeToReturn = GenerationOutcome.Success(File("dummy_outcome.img"))
+        viewModel.generateImage("prompt", cacheDir)
+        testDispatcher.scheduler.runCurrent()
+
+        // Confirm state is Loading and active entry is null
+        assertEquals(GenerationState.Loading, viewModel.generationState.value)
+        assertEquals(null, viewModel.activeEntry.value)
+
+        // Select 'second' from history while generation is Loading
+        viewModel.selectFromHistory(secondFileInHistory)
+        assertEquals(secondFileInHistory, viewModel.activeEntry.value?.file)
+        assertEquals(GenerationState.Loading, viewModel.generationState.value)
+
+        // Delete the active entry ('second')
+        viewModel.deleteFromHistory(secondFileInHistory)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Confirm it was removed from history, and active entry is now 'first'
+        assertEquals(1, viewModel.generationHistory.value.size)
+        val activeFile = viewModel.activeEntry.value?.file
+        assertEquals(first.name, activeFile?.name?.substringAfterLast("_"))
+
+        // BUT generation state must still be Loading!
+        assertEquals(GenerationState.Loading, viewModel.generationState.value)
+
+        // Now complete the generation and verify it updates to Success
+        mockRepository.gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.generationState.value is GenerationState.Success)
+    }
 }

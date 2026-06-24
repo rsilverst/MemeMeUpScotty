@@ -35,10 +35,10 @@ import com.rsilverst.mememeupscotty.ui.viewmodel.GenerationState
 import com.rsilverst.mememeupscotty.ui.viewmodel.HistoryEntry
 import com.rsilverst.mememeupscotty.ui.viewmodel.ImageModel
 
-// Phone layout: all controls (prompt, model picker, Energize) sit above
-// the canvas so the soft keyboard never covers the inputs; the canvas
-// shows the result; Save/Share sits at the bottom carrying the
-// navigationBars inset for edge-to-edge clearance.
+// Phone layout: the visual focal point (the Canvas) is placed
+// prominently at the top, followed by the history strip and
+// input controls underneath. Save/Share sits at the bottom
+// carrying the navigationBars inset for edge-to-edge clearance.
 
 @Composable
 internal fun CompactLayout(
@@ -61,12 +61,13 @@ internal fun CompactLayout(
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
     onPickImage: () -> Unit,
     generationHistory: List<HistoryEntry>,
-    activeFile: java.io.File?,
+    activeEntry: HistoryEntry?,
     onSelectFromHistory: (java.io.File) -> Unit,
     onDeleteFromHistory: (java.io.File) -> Unit,
     onClearAllHistory: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
+    val activeFile = activeEntry?.file
     Column(
         modifier = modifier
             .padding(horizontal = 16.dp)
@@ -84,16 +85,6 @@ internal fun CompactLayout(
             .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
-        PromptInput(
-            value = prompt,
-            onValueChange = onPromptChange,
-            singleLine = false,
-            minLines = 3,
-            onSubmit = onEnergize
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         HudStrip(
             selectedModel = selectedModel,
             onOpenModelPicker = onOpenModelPicker
@@ -101,17 +92,9 @@ internal fun CompactLayout(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        EnergizeButton(
-            generationState = generationState,
-            hasGeneratedImage = hasGeneratedImage,
-            onClick = onEnergize,
-            onCancel = onCancel
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         MemeCanvas(
             generationState = generationState,
+            activeEntry = activeEntry,
             captions = captions,
             onCaptionsChange = onCaptionsChange,
             capturing = capturing,
@@ -135,8 +118,27 @@ internal fun CompactLayout(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        PromptInput(
+            value = prompt,
+            onValueChange = onPromptChange,
+            singleLine = false,
+            minLines = 3,
+            onSubmit = onEnergize
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        EnergizeButton(
+            generationState = generationState,
+            hasGeneratedImage = hasGeneratedImage,
+            onClick = onEnergize,
+            onCancel = onCancel
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         val isLoading = generationState is GenerationState.Loading
-        val hasImage = generationState is GenerationState.Success
+        val hasImage = activeFile != null
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -187,12 +189,13 @@ internal fun ExpandedLayout(
     onCaptionDeleted: (onUndo: () -> Unit) -> Unit,
     onPickImage: () -> Unit,
     generationHistory: List<HistoryEntry>,
-    activeFile: java.io.File?,
+    activeEntry: HistoryEntry?,
     onSelectFromHistory: (java.io.File) -> Unit,
     onDeleteFromHistory: (java.io.File) -> Unit,
     onClearAllHistory: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
+    val activeFile = activeEntry?.file
     Row(
         modifier = modifier
             .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -209,6 +212,7 @@ internal fun ExpandedLayout(
         ) {
             MemeCanvas(
                 generationState = generationState,
+                activeEntry = activeEntry,
                 captions = captions,
                 onCaptionsChange = onCaptionsChange,
                 capturing = capturing,
@@ -268,7 +272,7 @@ internal fun ExpandedLayout(
             )
 
             val isLoading = generationState is GenerationState.Loading
-            val hasImage = generationState is GenerationState.Success
+            val hasImage = activeFile != null
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()

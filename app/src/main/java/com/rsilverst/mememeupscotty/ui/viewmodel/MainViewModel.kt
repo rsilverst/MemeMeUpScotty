@@ -19,14 +19,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 // Display names live in res/values/strings.xml as model_*_name via the
 // ui.ImageModelMetadata extension props; the `id` is the Replicate path.
@@ -65,14 +63,10 @@ class MainViewModel(
     private val _generationHistory = MutableStateFlow<List<HistoryEntry>>(emptyList())
     val generationHistory: StateFlow<List<HistoryEntry>> = _generationHistory.asStateFlow()
 
-    // The entry currently shown on the canvas, derived from which Success file
-    // is active. The UI reads its captions (live), prompt, and provenance from
-    // here. Null in Idle / Loading / Error.
-    val activeEntry: StateFlow<HistoryEntry?> =
-        combine(_generationHistory, _generationState) { history, state ->
-            val file = (state as? GenerationState.Success)?.imageFile
-            history.firstOrNull { it.file == file }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    // The entry currently shown on the canvas. Tapping history, loading an image,
+    // or completing a background generation updates this state.
+    private val _activeEntry = MutableStateFlow<HistoryEntry?>(null)
+    val activeEntry: StateFlow<HistoryEntry?> = _activeEntry.asStateFlow()
 
     // Tracks the in-flight generation coroutine so it can be cancelled
     private var generationJob: Job? = null
@@ -109,6 +103,7 @@ class MainViewModel(
                             if (currentHistory.isEmpty() && _generationState.value is GenerationState.Idle) {
                                 if (merged.isNotEmpty()) {
                                     _generationState.value = GenerationState.Success(merged.first().file)
+                                    _activeEntry.value = merged.first()
                                 }
                             }
                         } else {
@@ -144,9 +139,13 @@ class MainViewModel(
     // disk on every pixel but still survive a background-kill, and onCleared
     // flushes the very last edits synchronously.
     fun editActiveCaptions(transform: (CaptionSnapshot) -> CaptionSnapshot) {
-        val activeFile = (_generationState.value as? GenerationState.Success)?.imageFile ?: return
+        val activeFile = _activeEntry.value?.file ?: return
         _generationHistory.value = _generationHistory.value.map {
-            if (it.file == activeFile) it.copy(captions = transform(it.captions)) else it
+            if (it.file == activeFile) {
+                val updated = it.copy(captions = transform(it.captions))
+                _activeEntry.value = updated
+                updated
+            } else it
         }
         scheduleCaptionPersist()
     }
@@ -156,7 +155,7 @@ class MainViewModel(
     private fun scheduleCaptionPersist() {
         captionPersistJob?.cancel()
         captionPersistJob = viewModelScope.launch(ioDispatcher) {
-            delay(CAPTION_PERSIST_DEBOUNCE_MS)
+            delay(CAPTION_PERSIST_DEBOUNCE_MS.milliseconds)
             saveHistoryList(_generationHistory.value)
         }
     }
@@ -170,7 +169,9 @@ class MainViewModel(
         viewModelScope.launch(ioDispatcher) {
             persistFileOnDisk(file, persistedFile)
             withContext(Dispatchers.Main) {
-                appendToHistory(HistoryEntry(persistedFile))
+                val newEntry = HistoryEntry(persistedFile)
+                appendToHistory(newEntry)
+                _activeEntry.value = newEntry
                 _generationState.value = GenerationState.Success(persistedFile)
             }
         }
@@ -181,10 +182,15 @@ class MainViewModel(
     // entry. Captions ride along with the entry, still fully editable. Persists
     // so any caption edits to the entry we're leaving are written to disk.
     fun selectFromHistory(file: File) {
-        _generationState.value = GenerationState.Success(file)
         val entry = _generationHistory.value.firstOrNull { it.file == file }
-        entry?.modelId?.let { id ->
-            ImageModel.entries.firstOrNull { it.id == id }?.let { _selectedModel.value = it }
+        entry?.let {
+            _activeEntry.value = it
+            if (_generationState.value !is GenerationState.Loading) {
+                _generationState.value = GenerationState.Success(file)
+            }
+            it.modelId?.let { id ->
+                ImageModel.entries.firstOrNull { it.id == id }?.let { _selectedModel.value = it }
+            }
         }
         viewModelScope.launch(ioDispatcher) { saveHistoryList(_generationHistory.value) }
     }
@@ -196,6 +202,7 @@ class MainViewModel(
         val modelId = _selectedModel.value.id
         generationJob = viewModelScope.launch {
             _generationState.value = GenerationState.Loading
+            _activeEntry.value = null
             try {
                 val outcome = imageRepository.generateImage(modelId, prompt, cacheDir)
                 when (outcome) {
@@ -206,15 +213,18 @@ class MainViewModel(
                         viewModelScope.launch(ioDispatcher) {
                             persistFileOnDisk(outcome.file, persistedFile)
                             withContext(Dispatchers.Main) {
-                                appendToHistory(
-                                    HistoryEntry(
-                                        file = persistedFile,
-                                        prompt = prompt,
-                                        modelId = modelId,
-                                        seed = outcome.seed
-                                    )
+                                val newEntry = HistoryEntry(
+                                    file = persistedFile,
+                                    prompt = prompt,
+                                    modelId = modelId,
+                                    seed = outcome.seed
                                 )
+                                appendToHistory(newEntry)
                                 _generationState.value = GenerationState.Success(persistedFile)
+
+                                if (_activeEntry.value == null) {
+                                    _activeEntry.value = newEntry
+                                }
                             }
                         }
                     }
@@ -251,12 +261,15 @@ class MainViewModel(
             }
         }
 
-        val activeState = _generationState.value
-        if (activeState is GenerationState.Success && activeState.imageFile == file) {
-            if (newList.isNotEmpty()) {
-                _generationState.value = GenerationState.Success(newList.first().file)
-            } else {
-                _generationState.value = GenerationState.Idle
+        if (_activeEntry.value?.file == file) {
+            val nextEntry = newList.firstOrNull()
+            _activeEntry.value = nextEntry
+            if (_generationState.value !is GenerationState.Loading) {
+                if (nextEntry != null) {
+                    _generationState.value = GenerationState.Success(nextEntry.file)
+                } else {
+                    _generationState.value = GenerationState.Idle
+                }
             }
         }
     }
@@ -264,6 +277,7 @@ class MainViewModel(
     fun clearAllHistory() {
         val currentList = _generationHistory.value
         _generationHistory.value = emptyList()
+        _activeEntry.value = null
         _generationState.value = GenerationState.Idle
 
         viewModelScope.launch(ioDispatcher) {
@@ -282,7 +296,8 @@ class MainViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
+        // ViewModel.onCleared()'s base implementation is empty, so we don't call
+        // super (avoids the EmptySuperCall lint without a @SuppressLint).
         // viewModelScope is already cancelled by the time onCleared runs, so a
         // launch{} here would never execute. Flush the latest caption edits
         // synchronously instead — the payload is tiny, so the brief block on
