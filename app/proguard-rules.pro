@@ -15,21 +15,20 @@
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# Replicate API DTOs are deserialized by Moshi-Kotlin codegen, which
-# generates @JsonClass adapters at compile time. The generated adapters
-# reference the constructors and properties of these classes by name,
-# so they must survive R8.
--keep class com.rsilverst.mememeupscotty.data.network.** { *; }
--keepclassmembers class com.rsilverst.mememeupscotty.data.network.** {
+# Replicate API DTOs are deserialized by Moshi-Kotlin codegen, which generates
+# @JsonClass adapters at compile time. The generated adapters reference these
+# classes' constructors and properties, so keep those members. Scoping to
+# @JsonClass (rather than the whole package) lets ReplicateApi — covered by
+# Retrofit's own consumer rules — and NetworkModule shrink and obfuscate.
+-keepclassmembers @com.squareup.moshi.JsonClass class com.rsilverst.mememeupscotty.data.network.** {
     <init>(...);
     <fields>;
 }
 
 # History persistence DTOs (CaptionSnapshot, CaptionData, HistoryEntryDto) are
 # deserialized by Moshi-codegen; the generated adapters reference their
-# constructors and properties by name. Scope the keep to the @JsonClass models
-# so the rest of the package (MainViewModel, state classes) can still shrink.
--keep @com.squareup.moshi.JsonClass class com.rsilverst.mememeupscotty.ui.viewmodel.** { *; }
+# constructors and properties. Scope the keep to the @JsonClass models so the
+# rest of the package (MainViewModel, state classes) can still shrink.
 -keepclassmembers @com.squareup.moshi.JsonClass class com.rsilverst.mememeupscotty.ui.viewmodel.** {
     <init>(...);
     <fields>;
