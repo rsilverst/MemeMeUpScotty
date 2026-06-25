@@ -210,29 +210,35 @@ internal fun MemeCanvas(
             }
         }
 
-        // Top-right pill for importing from gallery (independent of generation state)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Space900.copy(alpha = 0.75f))
-                .clickable { onPickImage() }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.AddPhotoAlternate,
-                contentDescription = null,
-                tint = Photon500,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = stringResource(R.string.use_photo),
-                style = MaterialTheme.typography.labelMedium,
-                color = TextHigh
-            )
+        // Top-right pill for importing from gallery (independent of generation
+        // state). Hidden while capturing so it is not baked into the Save/Share
+        // snapshot — it is chrome, not part of the meme. The canvas records its
+        // whole content into the graphics layer during capture, so anything
+        // drawn here would otherwise end up in the exported image.
+        if (!capturing) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Space900.copy(alpha = 0.75f))
+                    .clickable { onPickImage() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AddPhotoAlternate,
+                    contentDescription = null,
+                    tint = Photon500,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = stringResource(R.string.use_photo),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextHigh
+                )
+            }
         }
     }
 }
