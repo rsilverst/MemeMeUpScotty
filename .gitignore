@@ -28,3 +28,4 @@ build/
 
 # Local design prototype, not for version control
 /mockups/e6-multitasking.html
+/logcat.txt
