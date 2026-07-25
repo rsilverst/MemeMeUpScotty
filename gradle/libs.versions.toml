@@ -1,5 +1,5 @@
 [versions]
-agp = "9.2.1"
+agp = "9.3.1"
 coreKtx = "1.19.0"
 coreSplashscreen = "1.2.0"
 junit = "4.13.2"
@@ -8,8 +8,8 @@ espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.11.0"
 lifecycleViewmodelCompose = "2.11.0"
 activityCompose = "1.13.0"
-kotlin = "2.4.0"
-composeBom = "2026.06.00"
+kotlin = "2.4.10"
+composeBom = "2026.06.01"
 googleDevtoolsKsp = "2.3.9"
 kotlinxCoroutinesTest = "1.11.0"
 runner = "1.7.0"
@@ -24,7 +24,7 @@ moshiKotlin = "1.15.2"
 moshiKotlinCodegen = "1.15.2"
 material = "1.14.0"
 datastore = "1.2.1"
-androidxAppfunctions = "1.0.0-alpha09"
+androidxAppfunctions = "1.0.0-alpha10"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
