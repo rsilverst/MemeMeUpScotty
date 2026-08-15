@@ -115,10 +115,6 @@ android {
     }
 }
 
-ksp {
-    arg("appfunctions:aggregateAppFunctions", "true")
-}
-
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
@@ -153,7 +149,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     "ksp"(libs.moshi.kotlin.codegen)
-    implementation(libs.androidx.appfunctions)
-    implementation(libs.androidx.appfunctions.service)
-    ksp(libs.androidx.appfunctions.compiler)
 }

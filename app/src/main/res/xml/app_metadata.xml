@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
-    appfn:description="This app generates and styles high-quality meme images using advanced generative AI models."
-    appfn:displayDescription="@string/app_description" />
