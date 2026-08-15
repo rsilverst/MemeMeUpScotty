@@ -56,10 +56,3 @@ If you ever decide to distribute, the following would need to land first:
   parody/fair-use posture, or licensing before public release.
 - **A2 / E10.** Reconsider the no-content-moderation stance. Play Store's generative-AI
   policy expects safety filters on and an in-app reporting path.
-
----
-
-## Reviewing
-
-The full engineering / UX / PM review lives in [CODE_REVIEW.md](./CODE_REVIEW.md),
-including a "Status Log" section that tracks per-PR progress against the findings.
