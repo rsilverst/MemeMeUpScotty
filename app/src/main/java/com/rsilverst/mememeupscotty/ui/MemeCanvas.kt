@@ -100,6 +100,7 @@ internal fun MemeCanvas(
     val top = captions.top
     val bottom = captions.bottom
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    var styleSheetTarget by remember { mutableStateOf<CaptionTarget?>(null) }
 
     // If the canvas width changed (e.g. device rotation, split screen), record
     // it in the snapshot. The TextOverlays need this reference width so their
@@ -179,7 +180,7 @@ internal fun MemeCanvas(
                             onCaptionsChange { snap -> snap.copy(top = restore) }
                         }
                     },
-                    onOpenStyleSheet = {},
+                    onOpenStyleSheet = { styleSheetTarget = CaptionTarget.TOP },
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
             }
@@ -204,7 +205,7 @@ internal fun MemeCanvas(
                             onCaptionsChange { snap -> snap.copy(bottom = restore) }
                         }
                     },
-                    onOpenStyleSheet = {},
+                    onOpenStyleSheet = { styleSheetTarget = CaptionTarget.BOTTOM },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
@@ -241,7 +242,26 @@ internal fun MemeCanvas(
             }
         }
     }
+
+    // Style edits route through editCaptions like every other caption change,
+    // so they persist with the entry and re-stamp refSize (a font change
+    // affects wrap, which the thumbnail preview scales from).
+    when (styleSheetTarget) {
+        CaptionTarget.TOP -> CaptionStyleSheet(
+            style = top.toStyle(),
+            onStyleChange = { style -> editCaptions { it.copy(top = it.top.withStyle(style)) } },
+            onDismiss = { styleSheetTarget = null }
+        )
+        CaptionTarget.BOTTOM -> CaptionStyleSheet(
+            style = bottom.toStyle(),
+            onStyleChange = { style -> editCaptions { it.copy(bottom = it.bottom.withStyle(style)) } },
+            onDismiss = { styleSheetTarget = null }
+        )
+        null -> Unit
+    }
 }
+
+private enum class CaptionTarget { TOP, BOTTOM }
 
 @Composable
 private fun LoadingState() {
