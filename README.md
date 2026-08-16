@@ -35,24 +35,35 @@ Kotlin Coroutines.
 
 ## Distribution status — read before sharing
 
-**This build is personal-use only. Do not distribute the APK.**
+**This build is personal-use only. Do not distribute the APK.** There is no intention to
+publish this app — distribution is a non-goal, recorded as a declined decision in
+[issue #1](https://github.com/rsilverst/MemeMeUpScotty/issues/1).
 
 Today the Replicate API token is compiled into `BuildConfig` and ships inside the APK.
 Anyone who installs the APK could decompile it and use the token, billing the owner.
-This is intentional for a single-user build and is tracked as item **A1** in
-[CODE_REVIEW.md](./CODE_REVIEW.md).
+This is intentional for a single-user build.
 
 The original project brief specifies no content moderation, so model-level safety
-filters are also disabled (`disable_safety_checker = true`). This is a personal-build
-decision; if distribution ever becomes a goal, A2/E10 in the review would need to be
-revisited along with the Play Store generative-AI policy requirements.
+filters are also disabled (`disable_safety_checker = true`). This is likewise a
+personal-build decision.
 
-If you ever decide to distribute, the following would need to land first:
+If distribution were ever reconsidered, the following would need to land first:
 
-- **A1.** Stand up a thin proxy (Cloudflare Worker, Vercel function, Firebase function)
-  that holds the token server-side. Point the app at it via `REPLICATE_BASE_URL`.
-- **A5.** R8/minify is on for release (PR 1). Add a release signing config before upload.
-- **A6 / E13.** App name and "Stardate" theme lean on Star Trek IP. Decide on rename,
-  parody/fair-use posture, or licensing before public release.
-- **A2 / E10.** Reconsider the no-content-moderation stance. Play Store's generative-AI
-  policy expects safety filters on and an in-app reporting path.
+- **Token proxy.** Stand up a thin proxy (Cloudflare Worker, Vercel function, Firebase
+  function) that holds the token server-side. Point the app at it via `REPLICATE_BASE_URL`.
+- **Release signing.** R8/minify and a signing config are already wired; a real keystore
+  (the `RELEASE_KEYSTORE_*` / `RELEASE_KEY_*` keys in `local.properties`) and the Play
+  requirements are not.
+- **Star Trek IP.** App name and "Stardate" theme lean on Star Trek IP. Decide on rename,
+  parody/fair-use posture, or licensing before any public release.
+- **Content moderation.** Reconsider the no-safety-filter stance. Play Store's
+  generative-AI policy expects safety filters on and an in-app reporting path.
+
+---
+
+## Documentation
+
+- [`architecture.md`](architecture.md) — current-state architecture reference; operational
+  runbooks and guardrails in §1.
+- [`AGENTS.md`](AGENTS.md) — instructions for AI coding agents working in this repo.
+- Tech debt & known bugs live in [GitHub Issues](https://github.com/rsilverst/MemeMeUpScotty/issues).
