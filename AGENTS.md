@@ -81,8 +81,8 @@ current task, open an issue with `gh issue create` instead of fixing it inline. 
 - **Lead every issue body with a plain-language `TL;DR (for Bob):`** — he's the non-technical
   orchestrator; translate the technical item into what it means, why it matters, and when to
   care. Technical detail goes below the TL;DR.
-- **Labels:** the repo currently carries only GitHub's default label set (verified 2026-08-15;
-  the tracker is empty). Use `bug` / `enhancement` where they fit; create additional labels
+- **Labels:** the repo currently carries only GitHub's default label set (verified 2026-09-15).
+  Use `bug` / `enhancement` / `documentation` where they fit; create additional labels
   (e.g. `priority: high|medium|low`, `tech-debt`) only when a real grouping need appears, and
   record the scheme here when you do.
 - A **declined** decision is recorded as a closed issue (`gh issue close --reason "not planned"`,
