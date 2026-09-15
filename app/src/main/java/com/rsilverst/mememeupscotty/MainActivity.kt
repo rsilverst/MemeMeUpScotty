@@ -31,15 +31,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Proactive cleanup of orphaned cache files bound to activity lifecycle:
+        // Proactive cleanup of orphaned cache files:
         // - generated_meme_* : AI generations (downloaded by ImageRepository)
         // - gallery_meme_*   : copies of user-picked photos
         // - shared_meme_*    : FileProvider-shared bitmaps from the share sheet (recursively cleaned)
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                cacheDir?.let { cleanCacheDirectory(it) }
-            } catch (e: Exception) {
-                Log.w(TAG, "Cache cleanup failed", e)
+        // Fresh launches only (savedInstanceState == null). On a configuration
+        // change the ViewModel survives with a generation or photo import
+        // possibly still writing its cache file, and deleting it here would
+        // leave a history entry pointing at a missing image.
+        if (savedInstanceState == null) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    cacheDir?.let { cleanCacheDirectory(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Cache cleanup failed", e)
+                }
             }
         }
 

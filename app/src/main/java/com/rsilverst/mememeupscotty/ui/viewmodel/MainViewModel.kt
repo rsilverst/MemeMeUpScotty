@@ -234,9 +234,14 @@ class MainViewModel(
                 }
             } catch (e: CancellationException) {
                 // Treat user-initiated cancellation as a return to Idle, not
-                // an error. Re-throw so the coroutine machinery still sees
-                // the cancellation cleanly.
-                _generationState.value = GenerationState.Idle
+                // an error. Only when this job is still the current one: a
+                // re-roll cancels the previous job and its handler runs after
+                // the new job has already posted Loading, which must survive.
+                // Re-throw so the coroutine machinery still sees the
+                // cancellation cleanly.
+                if (generationJob === coroutineContext[Job]) {
+                    _generationState.value = GenerationState.Idle
+                }
                 throw e
             }
         }

@@ -13,7 +13,7 @@ if (localPropertiesFile.exists()) {
 }
 val replicateToken = localProperties.getProperty("REPLICATE_API_TOKEN") ?: System.getenv("REPLICATE_API_TOKEN") ?: "YOUR_ACCESS_TOKEN"
 
-// Configurable base URL so a future proxy (see CODE_REVIEW.md item A1) can be
+// Configurable base URL so a proxy (see README "Distribution status") can be
 // swapped in with one local.properties line, without touching code.
 val replicateBaseUrl = localProperties.getProperty("REPLICATE_BASE_URL")
     ?: System.getenv("REPLICATE_BASE_URL")
@@ -48,9 +48,6 @@ if (replicateToken.isBlank() || replicateToken == "YOUR_ACCESS_TOKEN") {
 
         Alternatively, you can define an environment variable named:
            REPLICATE_API_TOKEN
-
-        Optional: override the default model (sdxl-based/juggernaut-xl-lightning) with
-           REPLICATE_MODEL_ID=owner/model
 
         Optional: point at a proxy instead of api.replicate.com with
            REPLICATE_BASE_URL=https://your-proxy.example.com/

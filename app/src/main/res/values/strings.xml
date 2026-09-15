@@ -11,6 +11,12 @@
     <string name="suggested_prompt_1">a corgi as the captain</string>
     <string name="suggested_prompt_2">spock holding a banana</string>
     <string name="suggested_prompt_3">the bridge, but tiny</string>
+    <string name="empty_state_title">AWAITING COORDINATES</string>
+    <string name="empty_state_detail">Enter a prompt below or pick a quick start.</string>
+    <string name="quick_start_prompt_1">a cute orange cat</string>
+    <string name="quick_start_prompt_2">cyberpunk city street</string>
+    <string name="quick_start_prompt_3">dog flying in space</string>
+    <string name="canvas_image_content_description">Meme image</string>
 
     <!-- Primary CTA -->
     <string name="generate">Energize</string>

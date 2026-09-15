@@ -39,10 +39,11 @@ private val outputFormat: OutputFormat = if (Build.VERSION.SDK_INT >= Build.VERS
 suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> {
     val appContext = context.applicationContext
     return withContext(Dispatchers.IO) {
+        val resolver = appContext.contentResolver
+        var imageUri: Uri? = null
         try {
             val filename = "meme_${System.currentTimeMillis()}.${outputFormat.extension}"
             var fos: java.io.OutputStream? = null
-            var imageUri: Uri? = null
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
                 put(MediaStore.MediaColumns.MIME_TYPE, outputFormat.mimeType)
@@ -51,8 +52,6 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> 
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
             }
-
-            val resolver = appContext.contentResolver
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -70,8 +69,11 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> 
                 throw Exception("Failed to open output stream")
             }
 
-            fos.use {
+            val compressed = fos.use {
                 bitmap.compress(outputFormat.compress, 100, it)
+            }
+            if (!compressed) {
+                throw Exception("Failed to encode image")
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -81,6 +83,16 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Result<Unit> 
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            // Drop the half-written (and on Q+ still IS_PENDING) row so a
+            // failed save doesn't leave a broken entry in the gallery.
+            imageUri?.let { uri ->
+                try {
+                    resolver.delete(uri, null, null)
+                } catch (cleanup: Exception) {
+                    Log.w(TAG, "Failed to remove incomplete MediaStore row", cleanup)
+                }
+            }
+            if (e is CancellationException) throw e
             Log.w(TAG, "saveBitmapToGallery failed", e)
             Result.failure(e)
         }
@@ -102,6 +114,7 @@ suspend fun copyUriToCache(context: Context, uri: Uri, cacheDir: File): Result<F
             }
             Result.success(file)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.w(TAG, "copyUriToCache failed", e)
             Result.failure(e)
         }

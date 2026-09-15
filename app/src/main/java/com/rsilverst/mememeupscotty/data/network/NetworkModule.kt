@@ -9,7 +9,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkModule {
-    // Sourced from BuildConfig so a future proxy (see CODE_REVIEW.md A1) can
+    // Sourced from BuildConfig so a proxy (see README "Distribution status") can
     // be swapped in via local.properties without touching code. Defaults to
     // api.replicate.com.
     private val BASE_URL = BuildConfig.REPLICATE_BASE_URL

@@ -46,8 +46,7 @@ Before making non-trivial code, operational, or repository changes:
   human.
 - Prefer the official CLIs (`gh`, `adb`, `./gradlew`) to verify real state rather than trusting
   what a doc claims. Docs in this repo can lag the code — e.g. the README cites review items
-  from a `CODE_REVIEW.md` that no longer exists, and the Gradle token warning advertises a
-  `REPLICATE_MODEL_ID` key that nothing reads. Verify before reporting something as live or
+  from a `CODE_REVIEW.md` that no longer exists. Verify before reporting something as live or
   tracked.
 
 ## Documentation rules
@@ -94,7 +93,7 @@ current task, open an issue with `gh issue create` instead of fixing it inline. 
 ```bash
 ./gradlew :app:assembleDebug          # build debug APK
 ./gradlew :app:installDebug           # build + install on a connected device/emulator
-./gradlew testDebugUnitTest           # unit tests (34 tests — JUnit4 + hand-rolled fakes, no MockK)
+./gradlew testDebugUnitTest           # unit tests (35 tests — JUnit4 + hand-rolled fakes, no MockK)
 ./gradlew connectedDebugAndroidTest   # Compose UI tests (needs a device; 3 tests)
 ./gradlew lint                        # Android lint
 ./gradlew :app:assembleRelease        # R8-minified release (signed only if keystore keys present)

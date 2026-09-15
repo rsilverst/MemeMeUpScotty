@@ -141,7 +141,7 @@ internal fun MemeCanvas(
         if (displayedFile != null) {
             AsyncImage(
                 model = displayedFile,
-                contentDescription = "Generated Meme",
+                contentDescription = stringResource(R.string.canvas_image_content_description),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
@@ -390,22 +390,15 @@ private fun ErrorState(error: GenerationError, onRetry: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "TRANSPORTER MALFUNCTION",
+            text = errorTitle(error),
             style = MaterialTheme.typography.titleMedium,
             color = Red500,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = when (error) {
-                is GenerationError.Unexpected -> error.detail
-                is GenerationError.Server -> "Server error \${error.httpCode}"
-                is GenerationError.RateLimited -> "Rate limited. Try again later."
-                GenerationError.Timeout -> "Request timed out."
-                GenerationError.AuthRejected -> "Authentication failed."
-                GenerationError.OutOfCredit -> "Out of credits."
-                GenerationError.ModelUnavailable -> "Model unavailable."
-            },
+            text = errorDetail(error),
             style = MaterialTheme.typography.bodyMedium,
             color = TextMid,
             textAlign = TextAlign.Center
@@ -421,7 +414,11 @@ private fun ErrorState(error: GenerationError, onRetry: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(Icons.Filled.Refresh, null, tint = TextHigh, modifier = Modifier.size(18.dp))
-            Text("RETRY", color = TextHigh, style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = stringResource(R.string.error_try_again).uppercase(),
+                color = TextHigh,
+                style = MaterialTheme.typography.labelLarge
+            )
         }
     }
 }
@@ -441,14 +438,14 @@ private fun EmptyState(onPromptChip: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "AWAITING COORDINATES",
+            text = stringResource(R.string.empty_state_title),
             style = MaterialTheme.typography.titleMedium,
             color = TextLow,
             letterSpacing = 1.sp
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Enter a prompt below or pick a quick start.",
+            text = stringResource(R.string.empty_state_detail),
             style = MaterialTheme.typography.bodyMedium,
             color = TextMid,
             textAlign = TextAlign.Center
@@ -459,11 +456,11 @@ private fun EmptyState(onPromptChip: (String) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            PromptChip("a cute orange cat", onPromptChip)
+            PromptChip(stringResource(R.string.quick_start_prompt_1), onPromptChip)
             Spacer(modifier = Modifier.size(8.dp))
-            PromptChip("cyberpunk city street", onPromptChip)
+            PromptChip(stringResource(R.string.quick_start_prompt_2), onPromptChip)
             Spacer(modifier = Modifier.size(8.dp))
-            PromptChip("dog flying in space", onPromptChip)
+            PromptChip(stringResource(R.string.quick_start_prompt_3), onPromptChip)
         }
     }
 }

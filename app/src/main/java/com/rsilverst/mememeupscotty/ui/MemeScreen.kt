@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -84,30 +85,8 @@ fun MemeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentError = (generationState as? GenerationState.Error)?.error
-    val errorTitle = currentError?.let { error ->
-        when (error) {
-            GenerationError.AuthRejected -> stringResource(R.string.error_title_auth)
-            GenerationError.OutOfCredit -> stringResource(R.string.error_title_quota)
-            GenerationError.ModelUnavailable -> stringResource(R.string.error_title_not_found)
-            is GenerationError.RateLimited -> stringResource(R.string.error_title_rate_limit)
-            is GenerationError.Server -> stringResource(R.string.error_title_server)
-            GenerationError.Timeout -> stringResource(R.string.error_title_timeout)
-            is GenerationError.Unexpected -> stringResource(R.string.error_title_generic)
-        }
-    }
-    val errorDetail = currentError?.let { error ->
-        when (error) {
-            GenerationError.AuthRejected -> stringResource(R.string.error_detail_auth)
-            GenerationError.OutOfCredit -> stringResource(R.string.error_detail_quota)
-            GenerationError.ModelUnavailable -> stringResource(R.string.error_detail_not_found)
-            is GenerationError.RateLimited -> error.retryAfterSec?.let {
-                stringResource(R.string.error_detail_rate_limit_retry, it)
-            } ?: stringResource(R.string.error_detail_rate_limit_no_retry)
-            is GenerationError.Server -> stringResource(R.string.error_detail_server, error.httpCode)
-            GenerationError.Timeout -> stringResource(R.string.error_detail_timeout)
-            is GenerationError.Unexpected -> error.detail
-        }
-    }
+    val errorTitle = currentError?.let { errorTitle(it) }
+    val errorDetail = currentError?.let { errorDetail(it) }
 
     LaunchedEffect(generationState) {
         if (generationState is GenerationState.Success) {
@@ -155,6 +134,32 @@ fun MemeScreen(
             )
         }
     }
+}
+
+// GenerationError -> user-facing copy. Shared by the snackbar (image already on
+// the canvas) and the full-canvas ErrorState so both read from strings.xml.
+@Composable
+internal fun errorTitle(error: GenerationError): String = when (error) {
+    GenerationError.AuthRejected -> stringResource(R.string.error_title_auth)
+    GenerationError.OutOfCredit -> stringResource(R.string.error_title_quota)
+    GenerationError.ModelUnavailable -> stringResource(R.string.error_title_not_found)
+    is GenerationError.RateLimited -> stringResource(R.string.error_title_rate_limit)
+    is GenerationError.Server -> stringResource(R.string.error_title_server)
+    GenerationError.Timeout -> stringResource(R.string.error_title_timeout)
+    is GenerationError.Unexpected -> stringResource(R.string.error_title_generic)
+}
+
+@Composable
+internal fun errorDetail(error: GenerationError): String = when (error) {
+    GenerationError.AuthRejected -> stringResource(R.string.error_detail_auth)
+    GenerationError.OutOfCredit -> stringResource(R.string.error_detail_quota)
+    GenerationError.ModelUnavailable -> stringResource(R.string.error_detail_not_found)
+    is GenerationError.RateLimited -> error.retryAfterSec?.let {
+        stringResource(R.string.error_detail_rate_limit_retry, it)
+    } ?: stringResource(R.string.error_detail_rate_limit_no_retry)
+    is GenerationError.Server -> stringResource(R.string.error_detail_server, error.httpCode)
+    GenerationError.Timeout -> stringResource(R.string.error_detail_timeout)
+    is GenerationError.Unexpected -> error.detail
 }
 
 private fun deepSpaceBrush(): Brush =
@@ -264,24 +269,35 @@ private fun MemeContent(
     // Waiting two frames (~32ms) was racy — the saved bitmap occasionally
     // caught a half-faded handle. 200ms covers the tween plus a small
     // buffer so the recorded layer is clean by the time we snapshot.
+    // try/finally so a failed or cancelled capture can't leave the chrome
+    // (photo pill, caption handles) hidden for the rest of the session.
     suspend fun captureCleanBitmap(): android.graphics.Bitmap {
         capturing = true
-        delay(CAPTURE_CHROME_FADE_BUFFER_MS.milliseconds)
-        val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-        capturing = false
-        return bitmap
+        try {
+            delay(CAPTURE_CHROME_FADE_BUFFER_MS.milliseconds)
+            return graphicsLayer.toImageBitmap().asAndroidBitmap()
+        } finally {
+            capturing = false
+        }
     }
 
     val captionRemoved = stringResource(R.string.caption_removed)
     val undoLabel = stringResource(R.string.undo)
+    val latestActiveFilePath by rememberUpdatedState(activeFilePath)
     val onCaptionDeleted: (onUndo: () -> Unit) -> Unit = { onUndo ->
+        // Undo edits whichever entry is active when tapped, so drop it if the
+        // user switched images while the snackbar was up — otherwise the
+        // deleted caption would be restored onto the wrong meme.
+        val deletedFromPath = activeFilePath
         coroutineScope.launch {
             val result = snackbarHostState.showSnackbar(
                 message = captionRemoved,
                 actionLabel = undoLabel,
                 duration = SnackbarDuration.Short
             )
-            if (result == SnackbarResult.ActionPerformed) onUndo()
+            if (result == SnackbarResult.ActionPerformed && latestActiveFilePath == deletedFromPath) {
+                onUndo()
+            }
         }
     }
 

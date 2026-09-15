@@ -84,8 +84,11 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
             val created = unwrap(createResponse)
                 ?: return@withContext failure(errorFor(createResponse))
 
-            val finished = poll(created.id)
-                ?: return@withContext failure(GenerationError.Timeout)
+            val finished = when (val polled = poll(created.id)) {
+                is PollResult.Finished -> polled.prediction
+                is PollResult.Failed -> return@withContext failure(polled.error)
+                PollResult.TimedOut -> return@withContext failure(GenerationError.Timeout)
+            }
 
             when (finished.status) {
                 "succeeded" -> {
@@ -109,17 +112,25 @@ class ReplicateImageRepository(private val api: ReplicateApi) : ImageRepository 
         }
     }
 
-    private suspend fun poll(id: String): ReplicatePrediction? {
+    private sealed class PollResult {
+        data class Finished(val prediction: ReplicatePrediction) : PollResult()
+        data class Failed(val error: GenerationError) : PollResult()
+        data object TimedOut : PollResult()
+    }
+
+    // An HTTP failure mid-poll maps to its typed error (401/429/5xx...) rather
+    // than masquerading as a timeout.
+    private suspend fun poll(id: String): PollResult {
         val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
         var interval = INITIAL_POLL_INTERVAL_MS
         while (System.currentTimeMillis() < deadline) {
             delay(interval)
             val response = api.getPrediction(id)
-            val prediction = unwrap(response) ?: return null
-            if (prediction.status in TERMINAL_STATUSES) return prediction
+            val prediction = unwrap(response) ?: return PollResult.Failed(errorFor(response))
+            if (prediction.status in TERMINAL_STATUSES) return PollResult.Finished(prediction)
             interval = (interval + 500).coerceAtMost(MAX_POLL_INTERVAL_MS)
         }
-        return null
+        return PollResult.TimedOut
     }
 
     private fun downloadTo(url: String, target: File) {

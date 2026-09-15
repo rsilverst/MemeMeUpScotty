@@ -139,19 +139,17 @@ class ReplicateImageRepositoryTest {
         assertTrue(error.detail.contains("no image"))
     }
 
-    // Per current behavior, an HTTP failure on getPrediction makes poll() return
-    // null, which the caller surfaces as Timeout. Pinning that so the contract
-    // is explicit; if we ever differentiate "poll error" from "actual timeout",
-    // this test should change deliberately.
+    // An HTTP failure on getPrediction maps to the same typed variant as any
+    // other call, not to Timeout (which is reserved for the poll deadline).
     @Test
-    fun getPrediction_HTTPFailureMidPoll_returnsTimeout() = runTest {
+    fun getPrediction_HTTPFailureMidPoll_mapsToTypedVariant() = runTest {
         val api = FakeReplicateApi(
             getModelResponse = okModelResponse(),
             createPredictionResponse = okPredictionResponse(status = "starting"),
             getPredictionResponse = errorResponse(500)
         )
         val outcome = ReplicateImageRepository(api).generateImage(validModelId, "p", cacheDir)
-        assertEquals(GenerationError.Timeout, (outcome as GenerationOutcome.Failure).error)
+        assertEquals(GenerationError.Server(500), (outcome as GenerationOutcome.Failure).error)
     }
 
     @Test

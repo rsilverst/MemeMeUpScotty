@@ -17,7 +17,7 @@
 ```bash
 ./gradlew :app:assembleDebug          # build debug APK
 ./gradlew :app:installDebug           # build + install on a connected device/emulator
-./gradlew testDebugUnitTest           # unit tests (34 tests, JUnit4 + hand-rolled fakes)
+./gradlew testDebugUnitTest           # unit tests (35 tests, JUnit4 + hand-rolled fakes)
 ./gradlew connectedDebugAndroidTest   # Compose UI tests (needs a device; 3 tests)
 ./gradlew lint                        # Android lint
 ./gradlew :app:assembleRelease        # R8-minified release (signed only if keys present, §1.2)
@@ -94,9 +94,8 @@ touching these to Bob before making it.**
   Studio/AGP ship a fix.
 - The old `lint { disable += "Instantiatable" }` workaround (an AGP 9.3-alpha false positive)
   was removed with the AGP 9.4.0 upgrade — `lintDebug` and `lintVitalRelease` pass without it.
-- **The Gradle token warning advertises `REPLICATE_MODEL_ID` — nothing reads it.** The default
-  model is the `ImageModel.JUGGERNAUT` enum entry; changing models is a code change (or the
-  in-app picker at runtime). Ignore that line of the warning.
+- **There is no model-id build property.** The default model is the `ImageModel.JUGGERNAUT`
+  enum entry; changing models is a code change (or the in-app picker at runtime).
 - Configuration cache and parallel mode are ON (`gradle.properties`); a build-script change
   invalidates the cache, which is expected noise, not a failure.
 
@@ -145,8 +144,9 @@ NetworkModule (object singletons: Retrofit, ReplicateApi, imageDownloadClient)
 - Splash: `installSplashScreen()` before `super.onCreate()`; manifest gives MainActivity the
   `Theme.MemeMeUpScotty.Starting` splash theme which swaps to the app theme post-splash.
   Edge-to-edge is enabled; `windowSoftInputMode="adjustResize"` so `imePadding()` works.
-- On every activity create, a background coroutine deletes orphaned ephemeral cache files
-  (`cleanCacheDirectory`, §7).
+- On a fresh activity launch (`savedInstanceState == null`, not a configuration change, so an
+  in-flight generation's temp file survives rotation), a background coroutine deletes orphaned
+  ephemeral cache files (`cleanCacheDirectory`, §7).
 - `allowBackup=false` — the meme history is device-local and not backed up.
 
 ## 4. Data layer: Replicate API client
@@ -359,12 +359,12 @@ operating on the flattened capture bitmap (§6.2):
 - **Import:** the system Photo Picker (no permission needed) → `copyUriToCache` streams the
   URI into a `gallery_meme_*` cache file → `MainViewModel.setLoadedImage` persists it into
   history like any generation.
-- **Cleanup:** `cleanCacheDirectory` (activity create, §3) deletes the three ephemeral
+- **Cleanup:** `cleanCacheDirectory` (fresh activity launch, §3) deletes the three ephemeral
   prefixes from `cacheDir` and `cacheDir/images`; the history dir is untouched.
 
 ## 8. Testing
 
-- **Unit tests** (34, `./gradlew testDebugUnitTest`): `MainViewModelTest` (17 — generation
+- **Unit tests** (35, `./gradlew testDebugUnitTest`): `MainViewModelTest` (18 — generation
   lifecycle, cancellation, history CRUD/eviction/merge, caption persistence),
   `ReplicateImageRepositoryTest` (15 — HTTP-code→error mapping, polling, cancellation
   propagation), `ImageUtilsTest` (2 — cache cleanup semantics).

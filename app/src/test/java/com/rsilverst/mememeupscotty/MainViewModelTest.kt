@@ -246,6 +246,25 @@ class MainViewModelTest {
     }
 
     @Test
+    fun generateImage_reRollMidFlight_staysLoading() = runTest(testDispatcher) {
+        val mockRepository = MockImageRepository()
+        val viewModel = createViewModel(mockRepository)
+
+        viewModel.generateImage("first", File("dummy_cache"))
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(GenerationState.Loading, viewModel.generationState.value)
+
+        // Second tap while the first is still parked on the gate. The first
+        // job's cancellation handler runs after the second job posted Loading
+        // and must not knock the state back to Idle.
+        viewModel.generateImage("second", File("dummy_cache"))
+        testDispatcher.scheduler.runCurrent()
+
+        assertEquals(GenerationState.Loading, viewModel.generationState.value)
+        assertEquals("second", mockRepository.lastPrompt)
+    }
+
+    @Test
     fun successfulGeneration_prependsToHistory_andKeepsPriorEntries() = runTest(testDispatcher) {
         val mockRepository = MockImageRepository()
         val viewModel = createViewModel(mockRepository)
