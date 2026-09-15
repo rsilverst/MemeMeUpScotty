@@ -11,7 +11,7 @@ Kotlin Coroutines.
 
 ## Building
 
-1. Install Android Studio (any version that supports AGP `9.3.x` — currently alpha) and
+1. Install Android Studio (any version that supports AGP `9.4.x`) and
    the Android SDK with platform 37.
 2. Create a Replicate API token at <https://replicate.com/account/api-tokens>.
 3. Drop the token into `local.properties` at the repo root:

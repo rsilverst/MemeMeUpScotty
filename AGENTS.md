@@ -108,15 +108,16 @@ signing properties — all four or release builds are unsigned. Full table: `arc
 ## Build toolchain / JDK
 
 - Modules compile to **Java 11** (`compileOptions` in `app/build.gradle.kts`). The Gradle
-  daemon runs on whatever JDK launches Gradle — Gradle 9.7.0 / AGP 9.3.1 need **17+** (verified
+  daemon runs on whatever JDK launches Gradle — Gradle 9.7.0 / AGP 9.4.0 need **17+** (verified
   working on JDK 25); the foojay resolver convention fetches compile toolchains. There is no
   daemon JVM pin; don't add a vendor-specific one.
-- **AGP 9.3.1 is an alpha-channel AGP with built-in Kotlin** — there is intentionally NO
+- **AGP 9.4.0 (stable) has built-in Kotlin** — there is intentionally NO
   `org.jetbrains.kotlin.android` plugin (only the Compose compiler plugin and KSP). Do not add
-  it back. Android Studio must be recent enough for AGP 9.3.x.
-- `lint { disable += "Instantiatable" }` is a known AGP-9.3-alpha false positive
-  (see the comment in `app/build.gradle.kts`) — remove it when an AGP upgrade fixes it, and
-  don't copy it anywhere else.
+  it back. Android Studio must be recent enough for AGP 9.4.x.
+- If Gradle fails applying `com.android.application` with *"Several environment variables
+  and/or system properties contain different paths to the Android Preferences folder"*, the
+  shell has both `ANDROID_USER_HOME` and the deprecated `ANDROID_PREFS_ROOT` set — run with
+  `env -u ANDROID_PREFS_ROOT ./gradlew …`. Details: `architecture.md` §1.4.
 
 ## Architecture conventions
 

@@ -75,14 +75,19 @@ touching these to Bob before making it.**
 
 ### 1.4 Dev-environment gotchas
 
-- **AGP 9.3.1 is an alpha-channel AGP** — Android Studio must be recent enough to open the
-  project (README pins "any version that supports AGP 9.3.x").
+- **AGP 9.4.0 (stable)** — Android Studio must be recent enough to open the project (README
+  pins "any version that supports AGP 9.4.x").
 - **There is no `org.jetbrains.kotlin.android` plugin — on purpose.** AGP 9 has built-in
   Kotlin support; the only Kotlin-adjacent plugins applied are the Compose compiler plugin and
   KSP. Do not add the standalone Kotlin Android plugin back.
-- **`lint { disable += "Instantiatable" }`** in [app/build.gradle.kts](app/build.gradle.kts) is
-  a false positive (AGP 9.3-alpha + activity 1.13 can't see that `ComponentActivity` extends
-  `Activity`). Re-enable when an AGP upgrade fixes it; don't cargo-cult it into new modules.
+- **Conflicting Android-prefs env vars break AGP 9.4.** If Gradle fails applying
+  `com.android.application` with `AndroidLocationsException: Several environment variables
+  and/or system properties contain different paths to the Android Preferences folder`, the
+  shell exports both `ANDROID_USER_HOME` and the deprecated `ANDROID_PREFS_ROOT` (seen in
+  Android Studio's agent shell). Run `env -u ANDROID_PREFS_ROOT ./gradlew …`; nothing in the
+  repo needs changing.
+- The old `lint { disable += "Instantiatable" }` workaround (an AGP 9.3-alpha false positive)
+  was removed with the AGP 9.4.0 upgrade — `lintDebug` and `lintVitalRelease` pass without it.
 - **The Gradle token warning advertises `REPLICATE_MODEL_ID` — nothing reads it.** The default
   model is the `ImageModel.JUGGERNAUT` enum entry; changing models is a code change (or the
   in-app picker at runtime). Ignore that line of the warning.
@@ -102,8 +107,8 @@ HTTP API (or a proxy via `REPLICATE_BASE_URL`, §1.2).
 
 - **Module:** `:app` only. Package / application id `com.rsilverst.mememeupscotty`;
   minSdk 26, target/compileSdk 37; versionCode 1, versionName 0.1.
-- **Toolchain:** Gradle 9.7.0 (wrapper), AGP 9.3.1 (built-in Kotlin — §1.4), Kotlin 2.4.10,
-  KSP 2.3.9, Compose BOM 2026.08.00, Material 3. Modules compile to **Java 11**
+- **Toolchain:** Gradle 9.7.0 (wrapper), AGP 9.4.0 (built-in Kotlin — §1.4), Kotlin 2.4.20,
+  KSP 2.3.9, Compose BOM 2026.09.00, Material 3. Modules compile to **Java 11**
   (`compileOptions`); the daemon runs on whatever JDK launches Gradle (needs 17+, currently
   verified on 25); the foojay resolver convention fetches compile toolchains. Pins live in
   [gradle/libs.versions.toml](gradle/libs.versions.toml).
