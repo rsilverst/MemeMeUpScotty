@@ -80,12 +80,18 @@ touching these to Bob before making it.**
 - **There is no `org.jetbrains.kotlin.android` plugin — on purpose.** AGP 9 has built-in
   Kotlin support; the only Kotlin-adjacent plugins applied are the Compose compiler plugin and
   KSP. Do not add the standalone Kotlin Android plugin back.
-- **Conflicting Android-prefs env vars break AGP 9.4.** If Gradle fails applying
+- **Android Studio's AI-agent shell breaks command-line AGP 9.4.** Gradle fails applying
   `com.android.application` with `AndroidLocationsException: Several environment variables
-  and/or system properties contain different paths to the Android Preferences folder`, the
-  shell exports both `ANDROID_USER_HOME` and the deprecated `ANDROID_PREFS_ROOT` (seen in
-  Android Studio's agent shell). Run `env -u ANDROID_PREFS_ROOT ./gradlew …`; nothing in the
-  repo needs changing.
+  and/or system properties contain different paths to the Android Preferences folder`. That
+  shell (and only that shell) injects both `ANDROID_USER_HOME` and the deprecated
+  `ANDROID_PREFS_ROOT`; they aren't set in any shell profile, launchd, Studio vmoptions, or
+  Gradle properties, and a plain `./gradlew` from a normal login shell builds fine (verified
+  2026-09-15). Both values are identical — AGP rejects the duplicate anyway; reported to Google
+  2026-09-15. **Mitigation (outside the repo):** Bob's `~/.bash_profile` runs
+  `[ -n "$ANDROID_STUDIO_AGENT" ] && unset ANDROID_PREFS_ROOT`, which the agent's login bash
+  sources, so plain `./gradlew` works there. If the error resurfaces (different shell, profile
+  reset), fall back to `env -u ANDROID_PREFS_ROOT ./gradlew …`. Remove the profile line once
+  Studio/AGP ship a fix.
 - The old `lint { disable += "Instantiatable" }` workaround (an AGP 9.3-alpha false positive)
   was removed with the AGP 9.4.0 upgrade — `lintDebug` and `lintVitalRelease` pass without it.
 - **The Gradle token warning advertises `REPLICATE_MODEL_ID` — nothing reads it.** The default

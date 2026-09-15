@@ -115,9 +115,11 @@ signing properties — all four or release builds are unsigned. Full table: `arc
   `org.jetbrains.kotlin.android` plugin (only the Compose compiler plugin and KSP). Do not add
   it back. Android Studio must be recent enough for AGP 9.4.x.
 - If Gradle fails applying `com.android.application` with *"Several environment variables
-  and/or system properties contain different paths to the Android Preferences folder"*, the
-  shell has both `ANDROID_USER_HOME` and the deprecated `ANDROID_PREFS_ROOT` set — run with
-  `env -u ANDROID_PREFS_ROOT ./gradlew …`. Details: `architecture.md` §1.4.
+  and/or system properties contain different paths to the Android Preferences folder"*, you're
+  in Android Studio's AI-agent shell, which injects both `ANDROID_USER_HOME` and the deprecated
+  `ANDROID_PREFS_ROOT`. Bob's `~/.bash_profile` already unsets the latter in that shell only;
+  if the error still appears, use `env -u ANDROID_PREFS_ROOT ./gradlew …` for that run.
+  Details: `architecture.md` §1.4.
 
 ## Architecture conventions
 
