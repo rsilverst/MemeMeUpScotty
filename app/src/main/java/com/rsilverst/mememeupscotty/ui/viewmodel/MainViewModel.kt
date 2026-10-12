@@ -74,6 +74,11 @@ class MainViewModel(
     // Debounced writer for live caption edits to the active image.
     private var captionPersistJob: Job? = null
 
+    // Flips true once the first DataStore emission has been merged. Until then
+    // the in-memory list is missing the persisted entries, so saveHistoryList
+    // refuses to write (it would overwrite the saved index). Written on Main,
+    // read on IO.
+    @Volatile
     private var isHistoryLoaded = false
 
     init {
@@ -402,6 +407,11 @@ class MainViewModel(
     }
 
     private suspend fun saveHistoryList(list: List<HistoryEntry>) {
+        // Before the first load, a write (onCleared, a debounced caption edit,
+        // a history tap) would replace the persisted index with an empty or
+        // partial list. Skip it: the first-load merge persists any in-memory
+        // entries itself, so nothing live is lost.
+        if (!isHistoryLoaded) return
         try {
             val json = historyAdapter.toJson(list.map { it.toDto() })
             dataStore.edit { preferences ->

@@ -17,7 +17,7 @@
 ```bash
 ./gradlew :app:assembleDebug          # build debug APK
 ./gradlew :app:installDebug           # build + install on a connected device/emulator
-./gradlew testDebugUnitTest           # unit tests (35 tests, JUnit4 + hand-rolled fakes)
+./gradlew testDebugUnitTest           # unit tests (36 tests, JUnit4 + hand-rolled fakes)
 ./gradlew connectedDebugAndroidTest   # Compose UI tests (needs a device; 3 tests)
 ./gradlew lint                        # Android lint
 ./gradlew :app:assembleRelease        # R8-minified release (signed only if keys present, §1.2)
@@ -68,7 +68,8 @@ touching these to Bob before making it.**
   `CAPTION_DEFAULT_MAX_HEIGHT`, `CAPTION_STROKE_RATIO`, and `findBestFitFontSize` (all in
   [MemeTextOverlay.kt](app/src/main/java/com/rsilverst/mememeupscotty/ui/MemeTextOverlay.kt))
   are used by both the live canvas overlay and the history-thumbnail renderer; the thumbnail
-  also mirrors the layouts' 16dp horizontal inset. Drift breaks the guarantee that a thumbnail
+  mirrors the canvas overlay's envelope (canvas width minus `CAPTION_INNER_PADDING` per side,
+  no extra inset — the overlays sit flush in the canvas). Drift breaks the guarantee that a thumbnail
   wraps text exactly like the canvas did (§6.3).
 - **The release keystore is gitignored and NOT preserved by git** (`*.jks` / `*.keystore`) —
   losing it means losing release signing.
@@ -244,6 +245,10 @@ Two-part store, capped at **50 entries FIFO** (eviction deletes the backing file
   entries under live in-memory ones (`distinctBy { it.file }` — live captions win). Later
   emissions only fold in files not already tracked: **in-memory state is authoritative**, all
   writes go through this VM, so live captions are never clobbered.
+- **No writes before the first load.** `saveHistoryList` is a no-op until the first emission
+  has been merged (`isHistoryLoaded`); an earlier write (`onCleared`, a debounced caption
+  edit) would otherwise replace the persisted index with an empty/partial list. The merge
+  persists any in-memory entries itself.
 - **Caption writes are debounced** (400ms after the last edit) so drags don't hit disk per
   pixel; `onCleared` flushes the last edits synchronously with `runBlocking` (viewModelScope
   is already dead there, and the payload is tiny).
@@ -364,7 +369,7 @@ operating on the flattened capture bitmap (§6.2):
 
 ## 8. Testing
 
-- **Unit tests** (35, `./gradlew testDebugUnitTest`): `MainViewModelTest` (18 — generation
+- **Unit tests** (36, `./gradlew testDebugUnitTest`): `MainViewModelTest` (19 — generation
   lifecycle, cancellation, history CRUD/eviction/merge, caption persistence),
   `ReplicateImageRepositoryTest` (15 — HTTP-code→error mapping, polling, cancellation
   propagation), `ImageUtilsTest` (2 — cache cleanup semantics).

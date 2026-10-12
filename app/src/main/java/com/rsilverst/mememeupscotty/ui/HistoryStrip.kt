@@ -291,11 +291,11 @@ private fun BoxScope.ThumbCaptionSlot(
     val style = caption.toStyle()
     val displayed = if (caption.allCaps) caption.text.uppercase() else caption.text
 
-    // Canvas reference envelope (full px), mirroring MemeTextOverlay: the text
-    // wraps within refSize minus the 16dp side insets and the inner padding.
-    val insetPx = with(density) { 16.dp.toPx() }
+    // Canvas reference envelope (full px), mirroring MemeTextOverlay: the
+    // overlay sits flush in the canvas, so the text wraps within refSize minus
+    // the inner padding on each side.
     val innerPx = with(density) { CAPTION_INNER_PADDING.toPx() }
-    val refWidthPx = (refSize - insetPx * 2 - innerPx * 2).toInt().coerceAtLeast(1)
+    val refWidthPx = (refSize - innerPx * 2).toInt().coerceAtLeast(1)
     val refHeightPx = with(density) { CAPTION_DEFAULT_MAX_HEIGHT.toPx() }.toInt()
     val canvasFont = remember(displayed, refWidthPx, refHeightPx, style.font) {
         findBestFitFontSize(
@@ -306,8 +306,8 @@ private fun BoxScope.ThumbCaptionSlot(
 
     val fontSize = (canvasFont.value * scale).sp
     val strokePx = with(density) { (fontSize.value * CAPTION_STROKE_RATIO).sp.toPx() }
-    // Text starts 16dp (inset) + inner padding below the canvas edge; scale that.
-    val edgeInsetDp = with(density) { ((insetPx + innerPx) * scale).toDp() }
+    // Text starts one inner padding in from the canvas edge; scale that.
+    val edgeInsetDp = with(density) { (innerPx * scale).toDp() }
     val widthDp = with(density) { (refWidthPx * scale).toDp() }
     val offX = with(density) { (caption.offsetX * scale).toDp() }
     val offY = with(density) { (caption.offsetY * scale).toDp() }

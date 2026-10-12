@@ -16,7 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -58,6 +60,27 @@ class FakeDataStore : DataStore<Preferences> {
     override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
         val current = stateFlow.value
         val next = transform(current)
+        stateFlow.value = next
+        return next
+    }
+}
+
+// DataStore whose first emission is held back until open() — models the window
+// at startup before the persisted history has been read.
+class GatedDataStore(initial: Preferences) : DataStore<Preferences> {
+    private val stateFlow = MutableStateFlow(initial)
+    private val gate = CompletableDeferred<Unit>()
+
+    fun open() = gate.complete(Unit)
+    fun current(): Preferences = stateFlow.value
+
+    override val data: Flow<Preferences> = flow {
+        gate.await()
+        emitAll(stateFlow)
+    }
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+        val next = transform(stateFlow.value)
         stateFlow.value = next
         return next
     }
@@ -357,6 +380,44 @@ class MainViewModelTest {
         existingFiles.forEach { file ->
             assertTrue("existing file ${file.name} should be persisted", savedJson.contains(file.name))
         }
+    }
+
+    @Test
+    fun writesBeforeFirstLoad_doNotOverwritePersistedHistory() = runTest(testDispatcher) {
+        val existing = (1..3).map { i ->
+            File(tempHistoryDir, "saved_$i.jpg").apply { createNewFile(); deleteOnExit() }
+        }
+        val legacyKey = stringPreferencesKey("history_paths")
+        val entriesKey = stringPreferencesKey("history_entries")
+        val dataStore = GatedDataStore(
+            emptyPreferences().toMutablePreferences().apply {
+                this[legacyKey] = existing.joinToString("\n") { it.name }
+            }
+        )
+        val viewModel = createViewModel(MockImageRepository(), dataStore = dataStore)
+
+        // Load an image and edit its caption while the persisted history is
+        // still unread; let the debounced caption write fire.
+        val picked = File.createTempFile("gated-pick-", ".img").apply { deleteOnExit() }
+        viewModel.setLoadedImage(picked)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.editActiveCaptions { it.copy(top = it.top.copy(text = "EARLY")) }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Nothing may have replaced the saved index yet.
+        assertEquals(null, dataStore.current()[entriesKey])
+
+        dataStore.open()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Saved entries survive, merged with the live one (caption intact),
+        // and the merged list is what gets persisted.
+        val history = viewModel.generationHistory.value
+        assertEquals(4, history.size)
+        assertEquals("EARLY", history.first { it.file.name.endsWith(picked.name) }.captions.top.text)
+        val savedJson = dataStore.current()[entriesKey] ?: ""
+        existing.forEach { assertTrue("${it.name} should be persisted", savedJson.contains(it.name)) }
+        assertTrue(savedJson.contains(picked.name))
     }
 
     @Test

@@ -93,7 +93,7 @@ current task, open an issue with `gh issue create` instead of fixing it inline. 
 ```bash
 ./gradlew :app:assembleDebug          # build debug APK
 ./gradlew :app:installDebug           # build + install on a connected device/emulator
-./gradlew testDebugUnitTest           # unit tests (35 tests — JUnit4 + hand-rolled fakes, no MockK)
+./gradlew testDebugUnitTest           # unit tests (36 tests — JUnit4 + hand-rolled fakes, no MockK)
 ./gradlew connectedDebugAndroidTest   # Compose UI tests (needs a device; 3 tests)
 ./gradlew lint                        # Android lint
 ./gradlew :app:assembleRelease        # R8-minified release (signed only if keystore keys present)
