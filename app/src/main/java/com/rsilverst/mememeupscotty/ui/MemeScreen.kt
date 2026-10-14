@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -230,7 +231,8 @@ private fun MemeContent(
     snackbarHostState: SnackbarHostState,
     onOpenModelPicker: () -> Unit
 ) {
-    var prompt by remember { mutableStateOf("") }
+    var prompt by rememberSaveable { mutableStateOf("") }
+    var lastRestoredFilePath by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Captions live with the active history entry in the ViewModel, so they
     // travel with their image and survive a reload — still as editable text,
@@ -241,11 +243,16 @@ private fun MemeContent(
 
     // When the active image changes (cold start, history tap, new generation),
     // restore the prompt that produced it. Keyed on the file so typing into the
-    // prompt for the current image is never clobbered. Gallery picks carry no
-    // prompt, so the field is left as-is for those.
+    // prompt for the current image is never clobbered. Remember the last path
+    // across recreation too: the effect runs again after rotation and must not
+    // overwrite the saved draft with that image's original prompt. Gallery
+    // picks carry no prompt, so the field is left as-is for those.
     val activeFilePath = activeEntryFromState?.file?.absolutePath
     LaunchedEffect(activeFilePath) {
-        activeEntryFromState?.prompt?.let { prompt = it }
+        if (activeFilePath != lastRestoredFilePath) {
+            activeEntryFromState?.prompt?.let { prompt = it }
+            lastRestoredFilePath = activeFilePath
+        }
     }
 
     val focusManager = LocalFocusManager.current
