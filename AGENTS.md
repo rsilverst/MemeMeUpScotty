@@ -132,9 +132,10 @@ signing properties — all four or release builds are unsigned. Full table: `arc
   layer never produces user-facing text (raw `Unexpected.detail` is the one exception).
 - **Captions are data, not pixels** — they stay editable and only get flattened at Save/Share.
   Anything drawn over the canvas that is chrome, not meme, must be gated on `!capturing`.
-- Moshi `@JsonClass` DTO field names ARE the wire/persisted format, protected by scoped R8
-  keep rules (`app/proguard-rules.pro`) — new Moshi DTOs outside `data/network/**` and
-  `ui/viewmodel/**` need a matching rule.
+- Moshi DTO property / `@Json` names ARE the wire/persisted format — don't rename them in
+  source. Every DTO must use codegen (`@JsonClass(generateAdapter = true)`); codegen adapters
+  survive R8 with no app keep rules. Anything reflective (no codegen, `KotlinJsonAdapterFactory`,
+  an enum-typed field) needs its own rule in `app/proguard-rules.pro`.
 - Persisted-history changes must stay backwards-compatible (legacy key, Moshi defaults,
   enum-name fallbacks) — guardrails in `architecture.md` §1.3.
 - Tests use **hand-rolled fakes, no mocking library** — keep new tests in that style.

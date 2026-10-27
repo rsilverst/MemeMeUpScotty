@@ -55,10 +55,14 @@ touching these to Bob before making it.**
   defaults). `readHistory` must keep decoding the legacy newline-joined `history_paths`
   format, and unknown style-enum names must keep falling back to defaults
   (`CaptionMapping.enumOrDefault`) rather than crashing.
-- **Moshi DTO field names are the wire/persisted format.** The proguard keep rules are scoped
-  to `@JsonClass` members in `data/network/**` and `ui/viewmodel/**`
-  ([proguard-rules.pro](app/proguard-rules.pro)). A new Moshi DTO outside those packages needs
-  its own rule; renaming a `@Json` name breaks the Replicate wire format or the saved history.
+- **Moshi DTO property / `@Json` names are the wire/persisted format.** Renaming one in source
+  breaks the Replicate wire format or the saved history. R8 renaming is safe: every DTO is
+  `@JsonClass(generateAdapter = true)` and no Moshi instance registers `KotlinJsonAdapterFactory`,
+  so the codegen adapters hard-code the JSON names and ship their own keep rules — there are
+  no app-level Moshi keep rules ([proguard-rules.pro](app/proguard-rules.pro)). A new DTO must
+  use codegen too; anything reflective (no codegen, a reflective factory, an enum-typed field)
+  needs its own keep rule. Caption styles are stored as `String` names, not enums, for this
+  reason among others.
 - **Cache-filename prefixes are a contract.** `generated_meme_` (repository),
   `gallery_meme_` / `shared_meme_` (ImageUtils) are matched by `cleanCacheDirectory` and by
   `MainViewModel.isEphemeralCacheFile` (which decides move-vs-copy into history). Add or rename
@@ -395,5 +399,6 @@ operating on the flattened capture bitmap (§6.2):
    ever add unknown entries, never overwrite live ones.
 6. **DI stays manual.** New dependencies get wired in `MainActivity` / `NetworkModule`; no
    Hilt/Dagger.
-7. **Moshi DTO field names are the wire/persisted format**, protected by `@JsonClass`-scoped
-   R8 keep rules.
+7. **Moshi DTO property / `@Json` names are the wire/persisted format**; DTOs use Moshi
+   codegen (`@JsonClass(generateAdapter = true)`), whose adapters survive R8 without app keep
+   rules (§1.3).
