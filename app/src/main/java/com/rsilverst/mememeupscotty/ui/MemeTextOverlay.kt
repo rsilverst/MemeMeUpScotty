@@ -224,8 +224,13 @@ internal fun MemeTextOverlay(
                     Box(contentAlignment = Alignment.Center) {
                         when {
                             displayedValue.isNotEmpty() && style.outline -> {
+                                // Lay the outline out in exactly the field's bounds
+                                // (BasicTextField enforces a min width wider than short
+                                // text), so textAlign resolves identically for both
+                                // layers instead of the outline wrapping and centering.
                                 Text(
                                     text = displayedValue,
+                                    modifier = Modifier.matchParentSize(),
                                     style = baseStyle.copy(
                                         color = Color.Black,
                                         drawStyle = Stroke(
