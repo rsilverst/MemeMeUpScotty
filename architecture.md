@@ -316,6 +316,9 @@ both the auto-fit font size and the text-box width are scaled from the canvas re
 same factor (`thumb / refSize`), so line wrapping matches the canvas exactly. This is the
 WYSIWYG contract behind the shared constants guardrail (§1.3); entries without a `refSize`
 (never-edited/legacy) render no preview.
+For resized captions, the preview fits text within the saved width/height minus inner padding,
+then scales the entire box and centers its text, matching the live overlay. Captions without
+a saved size use the default canvas-width / maximum-height fit envelope.
 
 ### 6.4 Controls
 

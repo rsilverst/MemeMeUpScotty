@@ -263,9 +263,9 @@ private fun HistoryThumb(
 // Read-only WYSIWYG render of the captions over a thumbnail. Wrapping matches
 // the canvas because both the font size and the text-box width are scaled from
 // the canvas reference by the same factor (thumb / refSize): the font is the
-// size the canvas's auto-fit would pick at full width, multiplied by the scale,
-// and the box width is the reference width times the scale — so the same number
-// of characters fit per line. Entries with no refSize render nothing.
+// size the canvas's auto-fit would pick inside the caption's reference envelope,
+// multiplied by the scale, and the box dimensions use the same scale — so the
+// same number of characters fit per line. Entries with no refSize render nothing.
 @Composable
 private fun ThumbnailCaptions(captions: CaptionSnapshot, modifier: Modifier) {
     val refSize = captions.refSize?.takeIf { it > 0f } ?: return
@@ -291,12 +291,16 @@ private fun BoxScope.ThumbCaptionSlot(
     val style = caption.toStyle()
     val displayed = if (caption.allCaps) caption.text.uppercase() else caption.text
 
-    // Canvas reference envelope (full px), mirroring MemeTextOverlay: the
-    // overlay sits flush in the canvas, so the text wraps within refSize minus
-    // the inner padding on each side.
+    // Match MemeTextOverlay's fit envelope in canvas pixels. A saved size is
+    // used only when both dimensions are present, just like the live overlay.
+    val size = caption.toSize()
     val innerPx = with(density) { CAPTION_INNER_PADDING.toPx() }
-    val refWidthPx = (refSize - innerPx * 2).toInt().coerceAtLeast(1)
-    val refHeightPx = with(density) { CAPTION_DEFAULT_MAX_HEIGHT.toPx() }.toInt()
+    val refWidthPx = ((size?.width ?: refSize) - innerPx * 2).toInt().coerceAtLeast(1)
+    val refHeightPx = if (size != null) {
+        (size.height - innerPx * 2).toInt().coerceAtLeast(0)
+    } else {
+        with(density) { CAPTION_DEFAULT_MAX_HEIGHT.toPx() }.toInt()
+    }
     val canvasFont = remember(displayed, refWidthPx, refHeightPx, style.font) {
         findBestFitFontSize(
             displayed, textMeasurer, style.font.fontFamily, style.font.fontWeight,
@@ -306,9 +310,22 @@ private fun BoxScope.ThumbCaptionSlot(
 
     val fontSize = (canvasFont.value * scale).sp
     val strokePx = with(density) { (fontSize.value * CAPTION_STROKE_RATIO).sp.toPx() }
-    // Text starts one inner padding in from the canvas edge; scale that.
+    // Scale the whole resized box, including its padding, so centered text
+    // keeps the same position within it. Auto-sized captions retain their
+    // top/bottom padding and wrap their height to the text, as on the canvas.
     val edgeInsetDp = with(density) { (innerPx * scale).toDp() }
-    val widthDp = with(density) { (refWidthPx * scale).toDp() }
+    val boxModifier = if (size != null) {
+        Modifier
+            .size(
+                width = with(density) { (size.width * scale).toDp() },
+                height = with(density) { (size.height * scale).toDp() }
+            )
+            .padding(edgeInsetDp)
+    } else {
+        Modifier
+            .padding(top = if (isTop) edgeInsetDp else 0.dp, bottom = if (isTop) 0.dp else edgeInsetDp)
+            .width(with(density) { (refWidthPx * scale).toDp() })
+    }
     val offX = with(density) { (caption.offsetX * scale).toDp() }
     val offY = with(density) { (caption.offsetY * scale).toDp() }
 
@@ -322,9 +339,9 @@ private fun BoxScope.ThumbCaptionSlot(
     Box(
         modifier = Modifier
             .align(if (isTop) Alignment.TopCenter else Alignment.BottomCenter)
-            .padding(top = if (isTop) edgeInsetDp else 0.dp, bottom = if (isTop) 0.dp else edgeInsetDp)
             .offset(x = offX, y = offY)
-            .width(widthDp)
+            .then(boxModifier),
+        contentAlignment = Alignment.Center
     ) {
         if (style.outline) {
             Text(
