@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -106,13 +107,13 @@ internal fun HistoryStrip(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "STARDATE ${getCurrentStardate()}",
+                    text = stringResource(R.string.history_stardate, getCurrentStardate()),
                     style = MaterialTheme.typography.labelMedium,
                     color = TextLow
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "· ${history.size} entries",
+                    text = pluralStringResource(R.plurals.history_entry_count, history.size, history.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = TextMid
                 )

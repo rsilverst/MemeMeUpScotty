@@ -1,16 +1,10 @@
 <resources>
     <string name="app_name">Meme Me Up, Scotty</string>
-    <string name="app_description">Generates high-quality base images for custom memes using advanced AI models like Juggernaut XL, SDXL, and Flux.</string>
 
     <!-- Prompt -->
     <string name="prompt_placeholder">Describe your meme&#8230;</string>
 
     <!-- Idle / empty state -->
-    <string name="idle_instruction">Tell us what to materialize.</string>
-    <string name="idle_try_one">Or try one of these</string>
-    <string name="suggested_prompt_1">a corgi as the captain</string>
-    <string name="suggested_prompt_2">spock holding a banana</string>
-    <string name="suggested_prompt_3">the bridge, but tiny</string>
     <string name="empty_state_title">AWAITING COORDINATES</string>
     <string name="empty_state_detail">Enter a prompt below or pick a quick start.</string>
     <string name="quick_start_prompt_1">a cute orange cat</string>
@@ -21,7 +15,6 @@
     <!-- Primary CTA -->
     <string name="generate">Energize</string>
     <string name="regenerate">Re-energize</string>
-    <string name="generating">Energizing&#8230;</string>
     <string name="materializing">Materializing</string>
     <string name="cancel">Cancel</string>
 
@@ -36,7 +29,6 @@
     <string name="failed_to_save">Failed to save</string>
     <string name="failed_to_share">Failed to share</string>
     <string name="storage_permission_required">Storage permission is required to save images</string>
-    <string name="error_message_format">Error: %1$s</string>
 
     <!-- Themed error headlines -->
     <string name="error_title_generic">Something went wrong.</string>
@@ -68,10 +60,6 @@
     <!-- Text box controls -->
     <string name="delete_text_box">Remove text box</string>
     <string name="resize_text_box">Resize text box</string>
-    <string name="move_text_box">Move text box</string>
-    <string name="edit_text_box">Edit text</string>
-    <string name="add_top_text">Add top text</string>
-    <string name="add_bottom_text">Add bottom text</string>
     <string name="caption_removed">Text box removed.</string>
     <string name="undo">Undo</string>
 
@@ -80,7 +68,11 @@
     <string name="load_image_failed">Couldn\'t load that image.</string>
 
     <!-- Generation history strip -->
-    <string name="history_label">This session</string>
+    <string name="history_stardate">STARDATE %1$s</string>
+    <plurals name="history_entry_count">
+        <item quantity="one">· %1$d entry</item>
+        <item quantity="other">· %1$d entries</item>
+    </plurals>
     <string name="history_thumb_content_description">Recent generation</string>
     <string name="history_delete_title">Delete from history?</string>
     <string name="history_delete_message">This will permanently remove this image from your local history.</string>
@@ -113,9 +105,6 @@
     <!-- Model picker -->
     <string name="choose_engine">Choose engine</string>
     <string name="model_active">Active</string>
-    <string name="filter_all">All</string>
-    <string name="filter_realism">Realism</string>
-    <string name="filter_stylized">Stylized</string>
 
     <string name="model_juggernaut_name">Juggernaut XL</string>
     <string name="model_juggernaut_desc">Versatile workhorse. Lightning-fast generation.</string>
